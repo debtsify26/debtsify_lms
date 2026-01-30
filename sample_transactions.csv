@@ -1,0 +1,5 @@
+Date,Amount,Type,Category,Description
+2026-01-20,5000,CREDIT,Repayment,Payment from Client A
+2026-01-22,10000,DEBIT,Disbursement,Loan to Client B
+2026-01-25,3000,CREDIT,Repayment,Payment from Client C
+2026-01-28,2500,CREDIT,Interest,Interest payment

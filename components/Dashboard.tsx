@@ -1,19 +1,18 @@
 import React from 'react';
 import { useData } from '../context/DataContext';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
   Cell
 } from 'recharts';
-import { TrendingUp, TrendingDown, Wallet, AlertCircle } from 'lucide-react';
-import { InstallmentStatus } from '../types';
+import { TrendingUp, TrendingDown, Wallet, Loader2 } from 'lucide-react';
 
 const KPICard = ({ title, amount, icon: Icon, color }: any) => (
   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-start justify-between">
@@ -30,15 +29,23 @@ const KPICard = ({ title, amount, icon: Icon, color }: any) => (
 );
 
 const Dashboard: React.FC = () => {
-  const { getFinancialSummary, installments, transactions } = useData();
+  const { getFinancialSummary, installments, transactions, isLoading } = useData();
   const summary = getFinancialSummary();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+      </div>
+    );
+  }
 
   // Prepare Chart Data
   const now = new Date();
   const monthlyFlow = Array.from({ length: 6 }).map((_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const monthKey = d.toLocaleString('default', { month: 'short' });
-    
+
     // Filter transactions for this month
     const monthlyTrans = transactions.filter(t => {
       const tDate = new Date(t.date);
@@ -52,39 +59,43 @@ const Dashboard: React.FC = () => {
   }).reverse();
 
   const statusData = [
-    { name: 'Paid On-Time', value: installments.filter(i => i.status === InstallmentStatus.PAID && !i.penalty).length },
-    { name: 'Paid Late', value: installments.filter(i => i.status === InstallmentStatus.PAID && i.penalty > 0).length },
-    { name: 'Pending', value: installments.filter(i => i.status === InstallmentStatus.PENDING).length },
-    { name: 'Overdue', value: installments.filter(i => i.status === InstallmentStatus.OVERDUE).length },
+    { name: 'Paid On-Time', value: installments.filter(i => i.status === 'PAID' && !i.penalty).length },
+    { name: 'Paid Late', value: installments.filter(i => i.status === 'PAID' && i.penalty > 0).length },
+    { name: 'Pending', value: installments.filter(i => i.status === 'PENDING').length },
+    { name: 'Overdue', value: installments.filter(i => i.status === 'OVERDUE').length },
   ];
 
   const COLORS = ['#10b981', '#f59e0b', '#3b82f6', '#ef4444'];
 
   const upcomingDue = installments
-    .filter(i => i.status === InstallmentStatus.PENDING || i.status === InstallmentStatus.OVERDUE)
-    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+    .filter(i => i.status === 'PENDING' || i.status === 'OVERDUE')
+    .sort((a, b) => {
+      const dateA = a.due_date || a.dueDate;
+      const dateB = b.due_date || b.dueDate;
+      return new Date(dateA).getTime() - new Date(dateB).getTime();
+    })
     .slice(0, 5);
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <KPICard 
-          title="Amount in Market" 
-          amount={summary.marketAmount} 
-          icon={TrendingUp} 
-          color="bg-blue-500" 
+        <KPICard
+          title="Amount in Market"
+          amount={summary.marketAmount}
+          icon={TrendingUp}
+          color="bg-blue-500"
         />
-        <KPICard 
-          title="Amount in Hand" 
-          amount={summary.cashInHand} 
-          icon={Wallet} 
-          color="bg-emerald-500" 
+        <KPICard
+          title="Amount in Hand"
+          amount={summary.cashInHand}
+          icon={Wallet}
+          color="bg-emerald-500"
         />
-        <KPICard 
-          title="Total Disbursed" 
-          amount={summary.totalDisbursed} 
-          icon={TrendingDown} 
-          color="bg-slate-700" 
+        <KPICard
+          title="Total Disbursed"
+          amount={summary.totalDisbursed}
+          icon={TrendingDown}
+          color="bg-slate-700"
         />
       </div>
 
@@ -158,22 +169,27 @@ const Dashboard: React.FC = () => {
               {upcomingDue.length === 0 ? (
                 <tr><td colSpan={4} className="p-6 text-center text-slate-400">No pending installments</td></tr>
               ) : (
-                upcomingDue.map(inst => (
-                  <tr key={inst.id} className="hover:bg-slate-50">
-                    <td className="px-6 py-3 text-slate-700">{inst.dueDate}</td>
-                    <td className="px-6 py-3 text-slate-800 font-medium">{inst.clientName}</td>
-                    <td className="px-6 py-3 text-right text-slate-700">₹{inst.expectedAmount}</td>
-                    <td className="px-6 py-3 text-center">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        inst.status === 'OVERDUE' 
-                        ? 'bg-red-100 text-red-600' 
-                        : 'bg-blue-100 text-blue-600'
-                      }`}>
-                        {inst.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))
+                upcomingDue.map(inst => {
+                  const dueDate = inst.due_date || inst.dueDate;
+                  const clientName = inst.client_name || inst.clientName;
+                  const expectedAmount = inst.expected_amount || inst.expectedAmount;
+
+                  return (
+                    <tr key={inst.id} className="hover:bg-slate-50">
+                      <td className="px-6 py-3 text-slate-700">{dueDate}</td>
+                      <td className="px-6 py-3 text-slate-800 font-medium">{clientName}</td>
+                      <td className="px-6 py-3 text-right text-slate-700">₹{expectedAmount?.toLocaleString()}</td>
+                      <td className="px-6 py-3 text-center">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${inst.status === 'OVERDUE'
+                            ? 'bg-red-100 text-red-600'
+                            : 'bg-blue-100 text-blue-600'
+                          }`}>
+                          {inst.status}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

@@ -1,17 +1,23 @@
-import React, { createContext, useContext, ReactNode } from 'react';
-import useLocalStorage from '../hooks/useLocalStorage';
-import { Loan, Installment, Transaction, LoanStatus, TransactionType } from '../types';
+import React, { createContext, useContext, ReactNode, useState, useEffect } from 'react';
+import { Loan, Installment, Transaction } from '../types';
+import { loansAPI, installmentsAPI, transactionsAPI } from '../services/api';
+import { useAuth } from './AuthContext';
 
 interface DataContextType {
   loans: Loan[];
   installments: Installment[];
   transactions: Transaction[];
-  addLoan: (loan: Loan) => void;
-  updateLoan: (loan: Loan) => void;
-  addInstallments: (newInstallments: Installment[]) => void;
-  updateInstallment: (installment: Installment) => void;
-  addTransaction: (transaction: Transaction) => void;
-  resetData: () => void;
+  isLoading: boolean;
+  error: string | null;
+  addLoan: (loan: Omit<Loan, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  updateLoan: (id: string, updates: Partial<Loan>) => Promise<void>;
+  deleteLoan: (id: string) => Promise<void>;
+  addInstallments: (newInstallments: Omit<Installment, 'id' | 'created_at' | 'updated_at'>[]) => Promise<void>;
+  updateInstallment: (id: string, updates: Partial<Installment>) => Promise<void>;
+  deleteInstallment: (id: string) => Promise<void>;
+  addTransaction: (transaction: Omit<Transaction, 'id' | 'created_at'>) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<void>;
+  refreshData: () => Promise<void>;
   getFinancialSummary: () => {
     marketAmount: number;
     cashInHand: number;
@@ -22,88 +28,198 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [loans, setLoans] = useLocalStorage<Loan[]>('debtsify_loans', []);
-  const [installments, setInstallments] = useLocalStorage<Installment[]>('debtsify_installments', []);
-  const [transactions, setTransactions] = useLocalStorage<Transaction[]>('debtsify_transactions', []);
+  const { isAuthenticated } = useAuth();
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [installments, setInstallments] = useState<Installment[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const addLoan = (loan: Loan) => {
-    setLoans((prev) => [...prev, loan]);
+  // Fetch all data when user logs in
+  const refreshData = async () => {
+    if (!isAuthenticated) {
+      setLoans([]);
+      setInstallments([]);
+      setTransactions([]);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const [loansData, installmentsData, transactionsData] = await Promise.all([
+        loansAPI.getAll(),
+        installmentsAPI.getAll(),
+        transactionsAPI.getAll(),
+      ]);
+
+      setLoans(loansData);
+      setInstallments(installmentsData);
+      setTransactions(transactionsData);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch data');
+      console.error('Error fetching data:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const updateLoan = (updatedLoan: Loan) => {
-    setLoans((prev) => prev.map((l) => (l.id === updatedLoan.id ? updatedLoan : l)));
+  // Load data on mount and when auth changes
+  useEffect(() => {
+    refreshData();
+  }, [isAuthenticated]);
+
+  // Loans
+  const addLoan = async (loanData: Omit<Loan, 'id' | 'created_at' | 'updated_at'>): Promise<any> => {
+    setError(null);
+    try {
+      const newLoan = await loansAPI.create(loanData);
+      setLoans((prev) => [...prev, newLoan]);
+      return newLoan; // Return the created loan so component can get the ID
+    } catch (err: any) {
+      setError(err.message || 'Failed to create loan');
+      throw err;
+    }
   };
 
-  const addInstallments = (newInstallments: Installment[]) => {
-    setInstallments((prev) => [...prev, ...newInstallments]);
+  const updateLoan = async (id: string, updates: Partial<Loan>) => {
+    setError(null);
+    try {
+      const updatedLoan = await loansAPI.update(id, updates);
+      setLoans((prev) => prev.map((l) => (l.id === id ? updatedLoan : l)));
+    } catch (err: any) {
+      setError(err.message || 'Failed to update loan');
+      throw err;
+    }
   };
 
-  const updateInstallment = (updatedInstallment: Installment) => {
-    setInstallments((prev) => prev.map((i) => (i.id === updatedInstallment.id ? updatedInstallment : i)));
+  const deleteLoan = async (id: string) => {
+    setError(null);
+    try {
+      await loansAPI.delete(id);
+      setLoans((prev) => prev.filter((l) => l.id !== id));
+      // Also remove related installments
+      setInstallments((prev) => prev.filter((i) => i.loan_id !== id));
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete loan');
+      throw err;
+    }
   };
 
-  const addTransaction = (transaction: Transaction) => {
-    setTransactions((prev) => [transaction, ...prev]); // Newest first
+  // Installments
+  const addInstallments = async (newInstallments: Omit<Installment, 'id' | 'created_at' | 'updated_at'>[]) => {
+    setError(null);
+    try {
+      const created = await installmentsAPI.bulkCreate(newInstallments);
+      setInstallments((prev) => [...prev, ...created]);
+    } catch (err: any) {
+      setError(err.message || 'Failed to create installments');
+      throw err;
+    }
   };
 
-  const resetData = () => {
-    setLoans([]);
-    setInstallments([]);
-    setTransactions([]);
+  const updateInstallment = async (id: string, updates: Partial<Installment>) => {
+    setError(null);
+    try {
+      const updated = await installmentsAPI.update(id, updates);
+      setInstallments((prev) => prev.map((i) => (i.id === id ? updated : i)));
+    } catch (err: any) {
+      setError(err.message || 'Failed to update installment');
+      throw err;
+    }
   };
 
+  const deleteInstallment = async (id: string) => {
+    setError(null);
+    try {
+      await installmentsAPI.delete(id);
+      setInstallments((prev) => prev.filter((i) => i.id !== id));
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete installment');
+      throw err;
+    }
+  };
+
+  // Transactions
+  const addTransaction = async (transactionData: Omit<Transaction, 'id' | 'created_at'>) => {
+    setError(null);
+    try {
+      const newTransaction = await transactionsAPI.create(transactionData);
+      setTransactions((prev) => [newTransaction, ...prev]); // Newest first
+    } catch (err: any) {
+      setError(err.message || 'Failed to create transaction');
+      throw err;
+    }
+  };
+
+  const deleteTransaction = async (id: string) => {
+    setError(null);
+    try {
+      await transactionsAPI.delete(id);
+      setTransactions((prev) => prev.filter((t) => t.id !== id));
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete transaction');
+      throw err;
+    }
+  };
+
+  // Financial summary (local calculation)
   const getFinancialSummary = () => {
-    // Market Amount: Principal of active daily loans + Unpaid expected amount of all installments
-    let marketAmount = 0;
-    
-    // 1. Add outstanding installments
-    installments.forEach(inst => {
-      if (inst.status !== 'PAID') {
-         marketAmount += (inst.expectedAmount - inst.paidAmount);
-      }
-    });
+    const activeLoans = loans.filter(l => l.status === 'ACTIVE');
 
-    // 2. Add Principal for Daily Rate loans (since installments only cover interest)
-    loans.forEach(loan => {
-      if (loan.type === 'DAILY_RATE' && loan.status === 'ACTIVE') {
-        marketAmount += loan.principalAmount;
+    const marketAmount = activeLoans.reduce((sum, loan) => {
+      if (loan.type === 'TOTAL_RATE' && loan.total_rate_multiplier) {
+        return sum + (loan.principal_amount * loan.total_rate_multiplier);
+      } else if (loan.type === 'DAILY_RATE') {
+        return sum + loan.principal_amount;
       }
-    });
-
-    // Cash In Hand: Transactions Sum
-    const cashInHand = transactions.reduce((acc, t) => {
-      return t.type === TransactionType.CREDIT ? acc + t.amount : acc - t.amount;
+      return sum;
     }, 0);
 
-    // Total Disbursed: Sum of principal of all loans
-    const totalDisbursed = loans.reduce((acc, l) => acc + l.principalAmount, 0);
+    const credits = transactions
+      .filter(t => t.type === 'CREDIT')
+      .reduce((sum, t) => sum + t.amount, 0);
 
-    return { marketAmount, cashInHand, totalDisbursed };
+    const debits = transactions
+      .filter(t => t.type === 'DEBIT')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const cashInHand = credits - debits;
+
+    const totalDisbursed = activeLoans.reduce((sum, loan) => sum + loan.principal_amount, 0);
+
+    return {
+      marketAmount,
+      cashInHand,
+      totalDisbursed,
+    };
   };
 
-  return (
-    <DataContext.Provider
-      value={{
-        loans,
-        installments,
-        transactions,
-        addLoan,
-        updateLoan,
-        addInstallments,
-        updateInstallment,
-        addTransaction,
-        resetData,
-        getFinancialSummary
-      }}
-    >
-      {children}
-    </DataContext.Provider>
-  );
+  const value = {
+    loans,
+    installments,
+    transactions,
+    isLoading,
+    error,
+    addLoan,
+    updateLoan,
+    deleteLoan,
+    addInstallments,
+    updateInstallment,
+    deleteInstallment,
+    addTransaction,
+    deleteTransaction,
+    refreshData,
+    getFinancialSummary,
+  };
+
+  return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 };
 
 export const useData = () => {
   const context = useContext(DataContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useData must be used within a DataProvider');
   }
   return context;

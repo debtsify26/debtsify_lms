@@ -6,6 +6,7 @@ export enum LoanType {
 export enum Frequency {
   DAILY = 'DAILY',
   WEEKLY = 'WEEKLY',
+  BIWEEKLY = 'BIWEEKLY',  // 15 days
   MONTHLY = 'MONTHLY',
 }
 
@@ -34,48 +35,76 @@ export interface Client {
   notes?: string;
 }
 
+// Using snake_case to match backend API response
 export interface Loan {
   id: string;
-  clientId: string;
-  clientName: string; // Denormalized for easier display
-  type: LoanType;
-  principalAmount: number;
-  startDate: string; // ISO Date string YYYY-MM-DD
-  status: LoanStatus;
-  
+  user_id?: string;
+  client_name: string;
+  type: LoanType | string;
+  principal_amount: number;
+  start_date: string;
+  status: LoanStatus | string;
+
   // Total Rate specific
-  totalRateMultiplier?: number; // e.g. 1.2
-  tenure?: number; // count of installments
-  
+  total_rate_multiplier?: number;
+  tenure?: number;
+
   // Daily Rate specific
-  dailyRatePerLakh?: number; // e.g. 100 per 1L per day
+  daily_rate_per_lakh?: number;
+  last_interest_generation_date?: string;
+
+  frequency: Frequency | string;
+  disbursement_date: string;
+  created_at?: string;
+
+  // Legacy camelCase support
+  clientId?: string;
+  clientName?: string;
+  principalAmount?: number;
+  startDate?: string;
+  totalRateMultiplier?: number;
+  dailyRatePerLakh?: number;
   lastInterestGenerationDate?: string;
-  
-  frequency: Frequency;
-  disbursementDate: string;
+  disbursementDate?: string;
 }
 
+// Using snake_case to match backend API response
 export interface Installment {
   id: string;
-  loanId: string;
-  clientName: string;
-  dueDate: string;
-  expectedAmount: number;
-  paidAmount: number;
+  user_id?: string;
+  loan_id: string;
+  client_name: string;
+  due_date: string;
+  expected_amount: number;
+  paid_amount: number;
   penalty: number;
-  status: InstallmentStatus;
-  paidDate?: string;
+  status: InstallmentStatus | string;
+  paid_date?: string | null;
   type: 'REGULAR' | 'INTEREST_ONLY' | 'PRINCIPAL_SETTLEMENT';
+  created_at?: string;
+
+  // Legacy camelCase support
+  loanId?: string;
+  clientName?: string;
+  dueDate?: string;
+  expectedAmount?: number;
+  paidAmount?: number;
+  paidDate?: string;
 }
 
 export interface Transaction {
   id: string;
-  date: string; // ISO DateTime
+  user_id?: string;
+  date: string;
   amount: number;
-  type: TransactionType;
-  category: string; // e.g., "Loan Repayment", "New Loan", "Expense"
+  type: TransactionType | string;
+  category: string;
   description: string;
-  relatedEntityId?: string; // Loan ID or Installment ID
+  related_entity_id?: string;
+  created_at?: string;
+
+  // Legacy camelCase support
+  relatedEntityId?: string;
 }
 
 export type View = 'DASHBOARD' | 'LOANS' | 'INSTALLMENTS' | 'LEDGER' | 'AI_ANALYST';

@@ -1,62 +1,57 @@
 import React, { useState } from 'react';
 import { View } from '../types';
-import { 
-  LayoutDashboard, 
-  Users, 
-  CalendarDays, 
-  BookOpen, 
-  Bot, 
+import { useAuth } from '../context/AuthContext';
+import {
+  LayoutDashboard,
+  Users,
+  CalendarDays,
+  BookOpen,
+  Bot,
   Menu,
   X,
-  LogOut
+  LogOut,
+  User
 } from 'lucide-react';
 
 interface LayoutProps {
   currentView: View;
   setView: (view: View) => void;
   children: React.ReactNode;
-  onReset: () => void;
+  userName?: string;
 }
 
-const NavItem = ({ 
-  view, 
-  current, 
-  label, 
-  icon: Icon, 
-  onClick 
-}: { 
-  view: View; 
-  current: View; 
-  label: string; 
-  icon: any; 
+const NavItem = ({
+  view,
+  current,
+  label,
+  icon: Icon,
+  onClick
+}: {
+  view: View;
+  current: View;
+  label: string;
+  icon: any;
   onClick: (v: View) => void;
 }) => (
   <button
     onClick={() => onClick(view)}
-    className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg transition-colors ${
-      current === view 
-        ? 'bg-primary-600 text-white shadow-md' 
+    className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg transition-colors ${current === view
+        ? 'bg-primary-600 text-white shadow-md'
         : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-    }`}
+      }`}
   >
     <Icon size={20} />
     <span className="font-medium">{label}</span>
   </button>
 );
 
-const Layout: React.FC<LayoutProps> = ({ currentView, setView, children, onReset }) => {
+const Layout: React.FC<LayoutProps> = ({ currentView, setView, children, userName = 'User' }) => {
+  const { logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [showResetModal, setShowResetModal] = useState(false);
-  const [password, setPassword] = useState('');
 
-  const handleReset = () => {
-    if (password === '987319') {
-      onReset();
-      setShowResetModal(false);
-      setPassword('');
-      alert('System Data Reset Successfully');
-    } else {
-      alert('Incorrect Password');
+  const handleLogout = async () => {
+    if (confirm('Are you sure you want to logout?')) {
+      await logout();
     }
   };
 
@@ -68,7 +63,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, setView, children, onReset
           <h1 className="text-2xl font-bold text-primary-400 tracking-tight">Debtsify<span className="text-white">.</span></h1>
           <p className="text-xs text-slate-500 mt-1">Loan Management System</p>
         </div>
-        
+
         <nav className="flex-1 p-4 space-y-2">
           <NavItem view="DASHBOARD" current={currentView} label="Dashboard" icon={LayoutDashboard} onClick={setView} />
           <NavItem view="LOANS" current={currentView} label="Loans" icon={Users} onClick={setView} />
@@ -77,13 +72,17 @@ const Layout: React.FC<LayoutProps> = ({ currentView, setView, children, onReset
           <NavItem view="AI_ANALYST" current={currentView} label="AI Analyst" icon={Bot} onClick={setView} />
         </nav>
 
-        <div className="p-4 border-t border-slate-800">
-          <button 
-            onClick={() => setShowResetModal(true)}
+        <div className="p-4 border-t border-slate-800 space-y-3">
+          <div className="flex items-center gap-3 px-4 py-2 text-slate-300">
+            <User size={16} className="text-primary-400" />
+            <span className="text-sm truncate">{userName}</span>
+          </div>
+          <button
+            onClick={handleLogout}
             className="flex items-center gap-3 w-full px-4 py-2 text-red-400 hover:text-red-300 transition-colors text-sm"
           >
             <LogOut size={16} />
-            Reset Data
+            Logout
           </button>
         </div>
       </aside>
@@ -99,20 +98,24 @@ const Layout: React.FC<LayoutProps> = ({ currentView, setView, children, onReset
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div className="md:hidden fixed inset-0 bg-slate-900 z-40 pt-20 px-4 space-y-4">
-           <NavItem view="DASHBOARD" current={currentView} label="Dashboard" icon={LayoutDashboard} onClick={(v) => {setView(v); setIsMobileMenuOpen(false)}} />
-           <NavItem view="LOANS" current={currentView} label="Loans" icon={Users} onClick={(v) => {setView(v); setIsMobileMenuOpen(false)}} />
-           <NavItem view="INSTALLMENTS" current={currentView} label="Schedule" icon={CalendarDays} onClick={(v) => {setView(v); setIsMobileMenuOpen(false)}} />
-           <NavItem view="LEDGER" current={currentView} label="Ledger" icon={BookOpen} onClick={(v) => {setView(v); setIsMobileMenuOpen(false)}} />
-           <NavItem view="AI_ANALYST" current={currentView} label="AI Analyst" icon={Bot} onClick={(v) => {setView(v); setIsMobileMenuOpen(false)}} />
-           <div className="pt-8 border-t border-slate-800 mt-4">
-              <button 
-                onClick={() => setShowResetModal(true)}
-                className="flex items-center gap-3 w-full px-4 py-3 text-red-400 font-medium"
-              >
-                <LogOut size={20} />
-                Reset System Data
-              </button>
-           </div>
+          <NavItem view="DASHBOARD" current={currentView} label="Dashboard" icon={LayoutDashboard} onClick={(v) => { setView(v); setIsMobileMenuOpen(false) }} />
+          <NavItem view="LOANS" current={currentView} label="Loans" icon={Users} onClick={(v) => { setView(v); setIsMobileMenuOpen(false) }} />
+          <NavItem view="INSTALLMENTS" current={currentView} label="Schedule" icon={CalendarDays} onClick={(v) => { setView(v); setIsMobileMenuOpen(false) }} />
+          <NavItem view="LEDGER" current={currentView} label="Ledger" icon={BookOpen} onClick={(v) => { setView(v); setIsMobileMenuOpen(false) }} />
+          <NavItem view="AI_ANALYST" current={currentView} label="AI Analyst" icon={Bot} onClick={(v) => { setView(v); setIsMobileMenuOpen(false) }} />
+          <div className="pt-8 border-t border-slate-800 mt-4 space-y-4">
+            <div className="flex items-center gap-3 px-4 py-2 text-white">
+              <User size={20} className="text-primary-400" />
+              <span className="truncate">{userName}</span>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-3 w-full px-4 py-3 text-red-400 font-medium"
+            >
+              <LogOut size={20} />
+              Logout
+            </button>
+          </div>
         </div>
       )}
 
@@ -123,26 +126,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, setView, children, onReset
         </div>
       </main>
 
-      {/* Reset Modal */}
-      {showResetModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
-          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
-            <h3 className="text-lg font-bold text-slate-800 mb-2">Factory Reset</h3>
-            <p className="text-slate-500 text-sm mb-4">Enter admin password to wipe all data.</p>
-            <input 
-              type="password" 
-              className="w-full border border-slate-300 rounded-lg p-2 mb-4 focus:ring-2 focus:ring-primary-500 outline-none"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setShowResetModal(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
-              <button onClick={handleReset} className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">Reset</button>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 };
