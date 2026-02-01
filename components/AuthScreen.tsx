@@ -3,38 +3,46 @@ import { useAuth } from '../context/AuthContext';
 import { LogIn, UserPlus, Loader2, AlertCircle } from 'lucide-react';
 
 const AuthScreen: React.FC = () => {
-    const { login, signup, error, isLoading } = useAuth();
-    const [isLoginMode, setIsLoginMode] = useState(true);
+    const { login, signup, forgotPassword, error, isLoading } = useAuth();
+    const [mode, setMode] = useState<'LOGIN' | 'SIGNUP' | 'FORGOT_PASSWORD'>('LOGIN');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [fullName, setFullName] = useState('');
     const [localError, setLocalError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLocalError('');
 
-        // Validation
-        if (!email || !password) {
-            setLocalError('Email and password are required');
+        if (!email) {
+            setLocalError('Email is required');
             return;
         }
 
-        if (!isLoginMode && !fullName) {
+        if (mode !== 'FORGOT_PASSWORD' && !password) {
+            setLocalError('Password is required');
+            return;
+        }
+
+        if (mode === 'SIGNUP' && !fullName) {
             setLocalError('Full name is required for signup');
             return;
         }
 
-        if (password.length < 6) {
+        if (mode !== 'FORGOT_PASSWORD' && password.length < 6) {
             setLocalError('Password must be at least 6 characters');
             return;
         }
 
         try {
-            if (isLoginMode) {
+            if (mode === 'LOGIN') {
                 await login(email, password);
-            } else {
+            } else if (mode === 'SIGNUP') {
                 await signup(email, password, fullName);
+            } else {
+                await forgotPassword(email);
+                setSuccessMessage('Password reset email sent! Check your inbox.');
             }
         } catch (err: any) {
             setLocalError(err.message || 'Authentication failed');
@@ -62,26 +70,34 @@ const AuthScreen: React.FC = () => {
                     {/* Tab Switcher */}
                     <div className="flex gap-2 mb-6 bg-neutral-100 p-1 rounded-xl">
                         <button
-                            onClick={() => setIsLoginMode(true)}
-                            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${isLoginMode
-                                    ? 'bg-white text-primary-700 shadow-md'
-                                    : 'text-neutral-600 hover:text-neutral-900'
+                            onClick={() => { setMode('LOGIN'); setSuccessMessage(''); setLocalError(''); }}
+                            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${mode === 'LOGIN' || mode === 'FORGOT_PASSWORD'
+                                ? 'bg-white text-primary-700 shadow-md'
+                                : 'text-neutral-600 hover:text-neutral-900'
                                 }`}
                         >
                             <LogIn className="w-4 h-4 inline-block mr-2" />
                             Login
                         </button>
                         <button
-                            onClick={() => setIsLoginMode(false)}
-                            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${!isLoginMode
-                                    ? 'bg-white text-primary-700 shadow-md'
-                                    : 'text-neutral-600 hover:text-neutral-900'
+                            onClick={() => { setMode('SIGNUP'); setSuccessMessage(''); setLocalError(''); }}
+                            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${mode === 'SIGNUP'
+                                ? 'bg-white text-primary-700 shadow-md'
+                                : 'text-neutral-600 hover:text-neutral-900'
                                 }`}
                         >
                             <UserPlus className="w-4 h-4 inline-block mr-2" />
                             Sign Up
                         </button>
                     </div>
+
+                    {/* Success Message */}
+                    {successMessage && (
+                        <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-3">
+                            <AlertCircle className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                            <p className="text-sm text-emerald-700">{successMessage}</p>
+                        </div>
+                    )}
 
                     {/* Error Message */}
                     {errorMessage && (
@@ -93,7 +109,7 @@ const AuthScreen: React.FC = () => {
 
                     {/* Form */}
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        {!isLoginMode && (
+                        {mode === 'SIGNUP' && (
                             <div>
                                 <label className="block text-sm font-medium text-neutral-700 mb-2">
                                     Full Name
@@ -120,25 +136,40 @@ const AuthScreen: React.FC = () => {
                                 placeholder="you@example.com"
                                 className="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                                 disabled={isLoading}
+                                required
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-neutral-700 mb-2">
-                                Password
-                            </label>
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="••••••••"
-                                className="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                                disabled={isLoading}
-                            />
-                            <p className="text-xs text-neutral-500 mt-1">
-                                {isLoginMode ? 'Enter your password' : 'Minimum 6 characters'}
-                            </p>
-                        </div>
+                        {mode !== 'FORGOT_PASSWORD' && (
+                            <div>
+                                <div className="flex justify-between mb-2">
+                                    <label className="block text-sm font-medium text-neutral-700">
+                                        Password
+                                    </label>
+                                    {mode === 'LOGIN' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => { setMode('FORGOT_PASSWORD'); setLocalError(''); setSuccessMessage(''); }}
+                                            className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                                        >
+                                            Forgot password?
+                                        </button>
+                                    )}
+                                </div>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                    className="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                                    disabled={isLoading}
+                                    required
+                                />
+                                <p className="text-xs text-neutral-500 mt-1">
+                                    {mode === 'LOGIN' ? 'Enter your password' : 'Minimum 6 characters'}
+                                </p>
+                            </div>
+                        )}
 
                         <button
                             type="submit"
@@ -148,12 +179,12 @@ const AuthScreen: React.FC = () => {
                             {isLoading ? (
                                 <>
                                     <Loader2 className="w-5 h-5 animate-spin" />
-                                    {isLoginMode ? 'Logging in...' : 'Creating account...'}
+                                    {mode === 'LOGIN' ? 'Logging in...' : mode === 'SIGNUP' ? 'Creating account...' : 'Sending email...'}
                                 </>
                             ) : (
                                 <>
-                                    {isLoginMode ? <LogIn className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />}
-                                    {isLoginMode ? 'Login' : 'Create Account'}
+                                    {mode === 'LOGIN' ? <LogIn className="w-5 h-5" /> : mode === 'SIGNUP' ? <UserPlus className="w-5 h-5" /> : null}
+                                    {mode === 'LOGIN' ? 'Login' : mode === 'SIGNUP' ? 'Create Account' : 'Send Reset Email'}
                                 </>
                             )}
                         </button>
@@ -172,12 +203,12 @@ const AuthScreen: React.FC = () => {
 
                     {/* Footer */}
                     <p className="text-center text-xs text-neutral-500 mt-6">
-                        {isLoginMode ? "Don't have an account? " : 'Already have an account? '}
+                        {mode === 'LOGIN' ? "Don't have an account? " : mode === 'SIGNUP' ? 'Already have an account? ' : 'Back to '}
                         <button
-                            onClick={() => setIsLoginMode(!isLoginMode)}
+                            onClick={() => { setMode(mode === 'LOGIN' ? 'SIGNUP' : 'LOGIN'); setSuccessMessage(''); setLocalError(''); }}
                             className="text-primary-600 hover:text-primary-700 font-semibold"
                         >
-                            {isLoginMode ? 'Sign up' : 'Login'}
+                            {mode === 'LOGIN' ? 'Sign up' : 'Login'}
                         </button>
                     </p>
                 </div>

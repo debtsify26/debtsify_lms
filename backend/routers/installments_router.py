@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List
 from supabase import Client
-from database import get_supabase
+from database import get_supabase_admin
 from schemas import InstallmentCreate, InstallmentUpdate, InstallmentResponse
 from auth import get_current_user_id
 
@@ -12,7 +12,7 @@ router = APIRouter(prefix="/installments", tags=["Installments"])
 async def create_installment(
     installment: InstallmentCreate,
     user_id: str = Depends(get_current_user_id),
-    db: Client = Depends(get_supabase)
+    db: Client = Depends(get_supabase_admin)
 ):
     """Create a new installment"""
     try:
@@ -42,7 +42,7 @@ async def create_installment(
 async def create_installments_bulk(
     installments: List[InstallmentCreate],
     user_id: str = Depends(get_current_user_id),
-    db: Client = Depends(get_supabase)
+    db: Client = Depends(get_supabase_admin)
 ):
     """Create multiple installments at once"""
     try:
@@ -75,7 +75,7 @@ async def get_installments(
     loan_id: str | None = None,
     status_filter: str | None = None,
     user_id: str = Depends(get_current_user_id),
-    db: Client = Depends(get_supabase)
+    db: Client = Depends(get_supabase_admin)
 ):
     """Get all installments for the current user"""
     try:
@@ -102,7 +102,7 @@ async def get_installments(
 async def get_installment(
     installment_id: str,
     user_id: str = Depends(get_current_user_id),
-    db: Client = Depends(get_supabase)
+    db: Client = Depends(get_supabase_admin)
 ):
     """Get a specific installment by ID"""
     try:
@@ -130,7 +130,7 @@ async def update_installment(
     installment_id: str,
     installment_update: InstallmentUpdate,
     user_id: str = Depends(get_current_user_id),
-    db: Client = Depends(get_supabase)
+    db: Client = Depends(get_supabase_admin)
 ):
     """Update an installment (record payment, etc.)"""
     try:
@@ -187,7 +187,7 @@ async def update_installment(
 async def delete_installment(
     installment_id: str,
     user_id: str = Depends(get_current_user_id),
-    db: Client = Depends(get_supabase)
+    db: Client = Depends(get_supabase_admin)
 ):
     """Delete an installment"""
     try:

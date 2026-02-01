@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS public.loans (
     type TEXT NOT NULL CHECK (type IN ('TOTAL_RATE', 'DAILY_RATE')),
     principal_amount DECIMAL(15, 2) NOT NULL CHECK (principal_amount > 0),
     start_date DATE NOT NULL,
-    frequency TEXT NOT NULL CHECK (frequency IN ('DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY')),
+    frequency TEXT NOT NULL,
     disbursement_date DATE NOT NULL,
     status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'CLOSED', 'BAD_DEBT')),
     

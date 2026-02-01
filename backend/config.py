@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     # Gemini API
     gemini_api_key: str | None = None
     
+    # Google Sheets Integration
+    google_sheets_credentials_json: str | None = None
+    google_spreadsheet_id: str | None = None
+    
     @property
     def cors_origins_list(self) -> List[str]:
         """Parse CORS origins from comma-separated string"""

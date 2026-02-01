@@ -93,6 +93,36 @@ export const authAPI = {
             removeAuthToken();
         }
     },
+
+    forgotPassword: async (email: string) => {
+        const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to send reset email');
+        }
+
+        return response.json();
+    },
+
+    resetPassword: async (newPassword: string, accessToken: string) => {
+        const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ new_password: newPassword, access_token: accessToken }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Password reset failed');
+        }
+
+        return response.json();
+    },
 };
 
 // Loans API
@@ -297,4 +327,20 @@ export const transactionsAPI = {
 export const healthCheck = async () => {
     const response = await fetch(`${API_BASE_URL}/health`);
     return response.json();
+};
+
+// Sync API
+export const syncAPI = {
+    syncData: async () => {
+        const response = await fetchWithAuth('/sync', {
+            method: 'POST',
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Sync failed');
+        }
+
+        return response.json();
+    },
 };

@@ -8,12 +8,23 @@ import Installments from './components/Installments';
 import Ledger from './components/Ledger';
 import AIAnalyst from './components/AIAnalyst';
 import AuthScreen from './components/AuthScreen';
+import InvestmentAnalytics from './components/InvestmentAnalytics';
+import ResetPassword from './components/ResetPassword';
 import { View } from './types';
 import { Loader2 } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const [currentView, setView] = useState<View>('DASHBOARD');
+  const [isResetPasswordMode, setIsResetPasswordMode] = useState(false);
+
+  React.useEffect(() => {
+    // Check for Supabase recovery type in hash
+    const hash = window.location.hash;
+    if (hash && hash.includes('type=recovery')) {
+      setIsResetPasswordMode(true);
+    }
+  }, []);
 
   // Show loading screen while checking authentication
   if (authLoading) {
@@ -25,6 +36,11 @@ const AppContent: React.FC = () => {
         </div>
       </div>
     );
+  }
+
+  // Show reset password screen if redirected from email
+  if (isResetPasswordMode) {
+    return <ResetPassword />;
   }
 
   // Show auth screen if not authenticated
@@ -40,6 +56,7 @@ const AppContent: React.FC = () => {
       case 'INSTALLMENTS': return <Installments />;
       case 'LEDGER': return <Ledger />;
       case 'AI_ANALYST': return <AIAnalyst />;
+      case 'INVESTMENT_ANALYTICS': return <InvestmentAnalytics />;
       default: return <Dashboard />;
     }
   };

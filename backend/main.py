@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from config import settings
-from routers import auth_router, loans_router, installments_router, transactions_router
+from routers import auth_router, loans_router, installments_router, transactions_router, sync_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -23,20 +23,21 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(auth_router.router)
+app.include_router(auth_router.router, prefix="/auth")
 app.include_router(loans_router.router)
 app.include_router(installments_router.router)
 app.include_router(transactions_router.router)
+app.include_router(sync_router.router)
 
 
 @app.get("/")
 async def root():
     """Root endpoint"""
     return {
-        "message": "Debtsify API",
-        "version": "1.0.0",
+        "message": "Debtsify API - VERIFIED v2",
+        "version": "1.0.2",
         "docs": "/docs",
-        "status": "online"
+        "status": "online - auth-fixed"
     }
 
 

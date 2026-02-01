@@ -107,4 +107,4 @@ export interface Transaction {
   relatedEntityId?: string;
 }
 
-export type View = 'DASHBOARD' | 'LOANS' | 'INSTALLMENTS' | 'LEDGER' | 'AI_ANALYST';
+export type View = 'DASHBOARD' | 'LOANS' | 'INSTALLMENTS' | 'LEDGER' | 'AI_ANALYST' | 'INVESTMENT_ANALYTICS';

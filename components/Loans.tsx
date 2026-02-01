@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { LoanType, Frequency, LoanStatus } from '../types';
-import { Plus, Search, Loader2, Pencil, Trash2, Download, X } from 'lucide-react';
+import { Plus, Search, Loader2, Pencil, Trash2, Download, X, ChevronUp, ChevronDown } from 'lucide-react';
 
 const Loans: React.FC = () => {
   const { loans, addLoan, updateLoan, deleteLoan, addInstallments, addTransaction, isLoading } = useData();
@@ -13,19 +13,20 @@ const Loans: React.FC = () => {
   // Form State
   const [clientName, setClientName] = useState('');
   const [loanType, setLoanType] = useState<LoanType>(LoanType.TOTAL_RATE);
-  const [principal, setPrincipal] = useState(10000);
-  const [frequency, setFrequency] = useState<Frequency>(Frequency.WEEKLY);
+  const [principal, setPrincipal] = useState<string>('10000');
+  const [frequency, setFrequency] = useState<string>('7');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Total Rate Specific
-  const [multiplier, setMultiplier] = useState(1.2);
-  const [tenure, setTenure] = useState(10);
+  const [multiplier, setMultiplier] = useState<string>('1.2');
+  const [tenure, setTenure] = useState<string>('10');
 
   // Daily Rate Specific
-  const [dailyRate, setDailyRate] = useState(100);
+  const [dailyRate, setDailyRate] = useState<string>('100');
 
   // Get days based on frequency
-  const getFrequencyDays = (freq: Frequency | string): number => {
+  const getFrequencyDays = (freq: any): number => {
+    if (!isNaN(Number(freq)) && freq !== '') return Number(freq);
     switch (freq) {
       case Frequency.DAILY:
       case 'DAILY': return 1;
@@ -39,16 +40,103 @@ const Loans: React.FC = () => {
     }
   };
 
+  const NumericField = ({
+    label,
+    value,
+    onChange,
+    onIncrement,
+    onDecrement,
+    min = 0,
+    max,
+    prefix,
+    disabled = false,
+    step = 1
+  }: {
+    label: string;
+    value: string;
+    onChange: (val: string) => void;
+    onIncrement: () => void;
+    onDecrement: () => void;
+    min?: number;
+    max?: number;
+    prefix?: string;
+    disabled?: boolean;
+    step?: number;
+  }) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      let val = e.target.value;
+      // Allow only numbers and decimals
+      if (val !== '' && !/^\d*\.?\d*$/.test(val)) return;
+
+      // Remove leading zeros
+      if (val.length > 1 && val.startsWith('0') && !val.startsWith('0.')) {
+        val = val.replace(/^0+/, '');
+      }
+      onChange(val);
+    };
+
+    const handleIncrement = () => {
+      const current = Number(value) || 0;
+      if (max !== undefined && current + step > max) return;
+      onChange((current + step).toString());
+    };
+
+    const handleDecrement = () => {
+      const current = Number(value) || 0;
+      if (current - step < min) return;
+      onChange((current - step).toString());
+    };
+
+    return (
+      <div>
+        <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+        <div className="flex">
+          <button
+            type="button"
+            onClick={onDecrement || handleDecrement}
+            disabled={disabled || (Number(value) || 0) <= min}
+            className="px-3 py-2 border border-slate-200 bg-slate-50 text-slate-600 rounded-l-lg hover:bg-slate-100 disabled:opacity-50 transition-colors flex items-center justify-center"
+            title="Decrease"
+          >
+            <ChevronDown size={18} />
+          </button>
+          <div className="relative flex-1">
+            {prefix && value !== '' && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">{prefix}</span>}
+            <input
+              type="text"
+              className={`w-full border-y border-slate-200 p-2 focus:outline-none focus:ring-1 focus:ring-primary-500 text-center ${prefix && value !== '' ? 'pl-7' : ''}`}
+              value={value}
+              onChange={handleChange}
+              disabled={disabled}
+              required
+              placeholder="0"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={onIncrement || handleIncrement}
+            disabled={disabled || (max !== undefined && (Number(value) || 0) >= max)}
+            className="px-3 py-2 border border-slate-200 bg-slate-50 text-slate-600 rounded-r-lg hover:bg-slate-100 transition-colors flex items-center justify-center"
+            title="Increase"
+          >
+            <ChevronUp size={18} />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+
   const openEditModal = (loan: any) => {
     setEditingLoan(loan);
     setClientName(loan.client_name || loan.clientName);
     setLoanType(loan.type);
-    setPrincipal(loan.principal_amount || loan.principalAmount);
-    setFrequency(loan.frequency);
+    setPrincipal(String(loan.principal_amount || loan.principalAmount || ''));
+    setFrequency(String(loan.frequency || '7'));
     setStartDate(loan.start_date || loan.startDate);
-    setMultiplier(loan.total_rate_multiplier || loan.totalRateMultiplier || 1.2);
-    setTenure(loan.tenure || 10);
-    setDailyRate(loan.daily_rate_per_lakh || loan.dailyRatePerLakh || 100);
+    setMultiplier(String(loan.total_rate_multiplier || loan.totalRateMultiplier || 1.2));
+    setTenure(String(loan.tenure || 10));
+    setDailyRate(String(loan.daily_rate_per_lakh || loan.dailyRatePerLakh || 100));
     setShowModal(true);
   };
 
@@ -164,10 +252,11 @@ const Loans: React.FC = () => {
 
   const resetForm = () => {
     setClientName('');
-    setPrincipal(10000);
-    setMultiplier(1.2);
-    setTenure(10);
-    setDailyRate(100);
+    setPrincipal('10000');
+    setFrequency('7');
+    setMultiplier('1.2');
+    setTenure('10');
+    setDailyRate('100');
     setEditingLoan(null);
   };
 
@@ -313,7 +402,11 @@ const Loans: React.FC = () => {
                   <div className="flex justify-between">
                     <span className="text-slate-500">Frequency</span>
                     <span className="font-medium text-slate-700">
-                      {loanFrequency === 'BIWEEKLY' ? '15 Days' : loanFrequency}
+                      {loanFrequency === 'BIWEEKLY' ? '15 Days' :
+                        loanFrequency === 'DAILY' ? 'Daily (1 Day)' :
+                          loanFrequency === 'WEEKLY' ? 'Weekly (7 Days)' :
+                            loanFrequency === 'MONTHLY' ? 'Monthly (30 Days)' :
+                              `${loanFrequency} ${Number(loanFrequency) === 1 ? 'Day' : 'Days'}`}
                     </span>
                   </div>
                   {loanType === 'TOTAL_RATE' && (
@@ -366,17 +459,16 @@ const Loans: React.FC = () => {
                     <option value={LoanType.DAILY_RATE}>Daily Rate (Recurring)</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Principal (₹)</label>
-                  <input
-                    required
-                    type="number"
-                    className="w-full border p-2 rounded-lg"
-                    value={principal}
-                    onChange={e => setPrincipal(Number(e.target.value))}
-                    disabled={!!editingLoan}
-                  />
-                </div>
+                <NumericField
+                  label="Principal (₹)"
+                  value={principal}
+                  onChange={setPrincipal}
+                  onIncrement={() => setPrincipal(prev => (Number(prev) + 1000).toString())}
+                  onDecrement={() => setPrincipal(prev => Math.max(0, Number(prev) - 1000).toString())}
+                  prefix="₹"
+                  disabled={!!editingLoan}
+                  step={1000}
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -391,70 +483,64 @@ const Loans: React.FC = () => {
                     disabled={!!editingLoan}
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Frequency</label>
-                  <select
-                    className="w-full border p-2 rounded-lg"
-                    value={frequency}
-                    onChange={e => setFrequency(e.target.value as Frequency)}
-                    disabled={!!editingLoan}
-                  >
-                    <option value={Frequency.DAILY}>Daily</option>
-                    <option value={Frequency.WEEKLY}>Weekly (7 Days)</option>
-                    <option value={Frequency.BIWEEKLY}>Biweekly (15 Days)</option>
-                    <option value={Frequency.MONTHLY}>Monthly (30 Days)</option>
-                  </select>
-                </div>
+                <NumericField
+                  label="Frequency (Days)"
+                  value={frequency}
+                  onChange={setFrequency}
+                  onIncrement={() => setFrequency(prev => Math.min(30, Number(prev) + 1).toString())}
+                  onDecrement={() => setFrequency(prev => Math.max(1, Number(prev) - 1).toString())}
+                  min={1}
+                  max={30}
+                  disabled={!!editingLoan}
+                />
               </div>
 
               {loanType === LoanType.TOTAL_RATE ? (
                 <div className="p-4 bg-slate-50 rounded-lg space-y-3">
                   <h4 className="text-sm font-bold text-slate-600">Total Rate Config</h4>
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs text-slate-500 mb-1">Multiplier (e.g. 1.2)</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        className="w-full border p-2 rounded-lg"
-                        value={multiplier}
-                        onChange={e => setMultiplier(Number(e.target.value))}
-                        disabled={!!editingLoan}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-slate-500 mb-1">Tenure (Installments)</label>
-                      <input
-                        type="number"
-                        className="w-full border p-2 rounded-lg"
-                        value={tenure}
-                        onChange={e => setTenure(Number(e.target.value))}
-                        disabled={!!editingLoan}
-                      />
-                    </div>
+                    <NumericField
+                      label="Multiplier (x)"
+                      value={multiplier}
+                      onChange={setMultiplier}
+                      onIncrement={() => setMultiplier(prev => (Number(prev) + 0.05).toFixed(2))}
+                      onDecrement={() => setMultiplier(prev => Math.max(1, Number(prev) - 0.05).toFixed(2))}
+                      min={1}
+                      disabled={!!editingLoan}
+                      step={0.05}
+                    />
+                    <NumericField
+                      label="Tenure (Installments)"
+                      value={tenure}
+                      onChange={setTenure}
+                      onIncrement={() => setTenure(prev => (Number(prev) + 1).toString())}
+                      onDecrement={() => setTenure(prev => Math.max(1, Number(prev) - 1).toString())}
+                      min={1}
+                      disabled={!!editingLoan}
+                    />
                   </div>
                   <div className="text-xs text-slate-500 mt-2">
-                    Total Repayment: <span className="font-bold text-primary-600">₹{Math.ceil(principal * multiplier).toLocaleString()}</span>
+                    Total Repayment: <span className="font-bold text-primary-600">₹{Math.ceil(Number(principal) * Number(multiplier)).toLocaleString()}</span>
                     <br />
-                    Per Installment: <span className="font-bold text-primary-600">₹{Math.ceil((principal * multiplier) / tenure).toLocaleString()}</span>
+                    Per Installment: <span className="font-bold text-primary-600">₹{Math.ceil((Number(principal) * Number(multiplier)) / (Number(tenure) || 1)).toLocaleString()}</span>
                   </div>
                 </div>
               ) : (
                 <div className="p-4 bg-slate-50 rounded-lg space-y-3">
                   <h4 className="text-sm font-bold text-slate-600">Daily Rate Config</h4>
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1">Rate per ₹1 Lakh / Day</label>
-                    <input
-                      type="number"
-                      className="w-full border p-2 rounded-lg"
-                      value={dailyRate}
-                      onChange={e => setDailyRate(Number(e.target.value))}
-                      disabled={!!editingLoan}
-                    />
-                  </div>
+                  <NumericField
+                    label="Rate per ₹1 Lakh / Day"
+                    value={dailyRate}
+                    onChange={setDailyRate}
+                    onIncrement={() => setDailyRate(prev => (Number(prev) + 10).toString())}
+                    onDecrement={() => setDailyRate(prev => Math.max(0, Number(prev) - 10).toString())}
+                    prefix="₹"
+                    disabled={!!editingLoan}
+                    step={10}
+                  />
                   <div className="text-xs text-slate-500 mt-2">
                     Est. Interest (per {days} days): <span className="font-bold text-primary-600">
-                      ₹{Math.ceil((principal / 100000) * dailyRate * days).toLocaleString()}
+                      ₹{Math.ceil((Number(principal) / 100000) * Number(dailyRate) * days).toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -494,9 +580,9 @@ const Loans: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div >
       )}
-    </div>
+    </div >
   );
 };
 

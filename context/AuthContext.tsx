@@ -14,6 +14,8 @@ interface AuthContextType {
     login: (email: string, password: string) => Promise<void>;
     signup: (email: string, password: string, fullName: string) => Promise<void>;
     logout: () => Promise<void>;
+    forgotPassword: (email: string) => Promise<void>;
+    resetPassword: (newPassword: string, accessToken: string) => Promise<void>;
     error: string | null;
 }
 
@@ -92,6 +94,34 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
+    const forgotPassword = async (email: string) => {
+        setError(null);
+        setIsLoading(true);
+
+        try {
+            await authAPI.forgotPassword(email);
+        } catch (err: any) {
+            setError(err.message || 'Failed to send reset email');
+            throw err;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const resetPassword = async (newPassword: string, accessToken: string) => {
+        setError(null);
+        setIsLoading(true);
+
+        try {
+            await authAPI.resetPassword(newPassword, accessToken);
+        } catch (err: any) {
+            setError(err.message || 'Failed to reset password');
+            throw err;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const value = {
         user,
         isAuthenticated: !!user,
@@ -99,6 +129,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         login,
         signup,
         logout,
+        forgotPassword,
+        resetPassword,
         error,
     };
 

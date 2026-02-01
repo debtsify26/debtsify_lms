@@ -22,3 +22,5 @@ python-dateutil==2.9.0
 
 # Utilities
 email-validator==2.2.0
+gspread==6.1.2
+google-auth==2.35.0

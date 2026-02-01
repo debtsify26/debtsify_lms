@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List
 from supabase import Client
-from database import get_supabase
+from database import get_supabase_admin
 from schemas import LoanCreate, LoanUpdate, LoanResponse
 from auth import get_current_user_id
 
@@ -12,7 +12,7 @@ router = APIRouter(prefix="/loans", tags=["Loans"])
 async def create_loan(
     loan: LoanCreate,
     user_id: str = Depends(get_current_user_id),
-    db: Client = Depends(get_supabase)
+    db: Client = Depends(get_supabase_admin)
 ):
     """Create a new loan"""
     try:
@@ -42,7 +42,7 @@ async def create_loan(
 async def get_loans(
     status_filter: str | None = None,
     user_id: str = Depends(get_current_user_id),
-    db: Client = Depends(get_supabase)
+    db: Client = Depends(get_supabase_admin)
 ):
     """Get all loans for the current user"""
     try:
@@ -66,7 +66,7 @@ async def get_loans(
 async def get_loan(
     loan_id: str,
     user_id: str = Depends(get_current_user_id),
-    db: Client = Depends(get_supabase)
+    db: Client = Depends(get_supabase_admin)
 ):
     """Get a specific loan by ID"""
     try:
@@ -94,7 +94,7 @@ async def update_loan(
     loan_id: str,
     loan_update: LoanUpdate,
     user_id: str = Depends(get_current_user_id),
-    db: Client = Depends(get_supabase)
+    db: Client = Depends(get_supabase_admin)
 ):
     """Update a loan"""
     try:
@@ -132,7 +132,7 @@ async def update_loan(
 async def delete_loan(
     loan_id: str,
     user_id: str = Depends(get_current_user_id),
-    db: Client = Depends(get_supabase)
+    db: Client = Depends(get_supabase_admin)
 ):
     """Delete a loan"""
     try:

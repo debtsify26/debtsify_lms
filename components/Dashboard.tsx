@@ -29,8 +29,8 @@ const KPICard = ({ title, amount, icon: Icon, color }: any) => (
 );
 
 const Dashboard: React.FC = () => {
-  const { getFinancialSummary, installments, transactions, isLoading } = useData();
-  const summary = getFinancialSummary();
+  const { localSummary, installments, transactions, isLoading } = useData();
+  const summary = localSummary();
 
   if (isLoading) {
     return (
@@ -86,8 +86,8 @@ const Dashboard: React.FC = () => {
           color="bg-blue-500"
         />
         <KPICard
-          title="Amount in Hand"
-          amount={summary.cashInHand}
+          title="Total Collected"
+          amount={summary.totalCollected}
           icon={Wallet}
           color="bg-emerald-500"
         />
@@ -181,8 +181,8 @@ const Dashboard: React.FC = () => {
                       <td className="px-6 py-3 text-right text-slate-700">₹{expectedAmount?.toLocaleString()}</td>
                       <td className="px-6 py-3 text-center">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${inst.status === 'OVERDUE'
-                            ? 'bg-red-100 text-red-600'
-                            : 'bg-blue-100 text-blue-600'
+                          ? 'bg-red-100 text-red-600'
+                          : 'bg-blue-100 text-blue-600'
                           }`}>
                           {inst.status}
                         </span>

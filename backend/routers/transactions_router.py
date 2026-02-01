@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List
 from supabase import Client
-from database import get_supabase
+from database import get_supabase_admin
 from schemas import TransactionCreate, TransactionResponse, FinancialSummary
 from auth import get_current_user_id
 
@@ -12,7 +12,7 @@ router = APIRouter(prefix="/transactions", tags=["Transactions"])
 async def create_transaction(
     transaction: TransactionCreate,
     user_id: str = Depends(get_current_user_id),
-    db: Client = Depends(get_supabase)
+    db: Client = Depends(get_supabase_admin)
 ):
     """Create a new transaction"""
     try:
@@ -49,7 +49,7 @@ async def get_transactions(
     type_filter: str | None = None,
     limit: int = 100,
     user_id: str = Depends(get_current_user_id),
-    db: Client = Depends(get_supabase)
+    db: Client = Depends(get_supabase_admin)
 ):
     """Get all transactions for the current user"""
     try:
@@ -73,7 +73,7 @@ async def get_transactions(
 async def get_transaction(
     transaction_id: str,
     user_id: str = Depends(get_current_user_id),
-    db: Client = Depends(get_supabase)
+    db: Client = Depends(get_supabase_admin)
 ):
     """Get a specific transaction by ID"""
     try:
@@ -100,7 +100,7 @@ async def get_transaction(
 async def delete_transaction(
     transaction_id: str,
     user_id: str = Depends(get_current_user_id),
-    db: Client = Depends(get_supabase)
+    db: Client = Depends(get_supabase_admin)
 ):
     """Delete a transaction"""
     try:
@@ -128,7 +128,7 @@ async def delete_transaction(
 @router.get("/summary/financial", response_model=FinancialSummary)
 async def get_financial_summary(
     user_id: str = Depends(get_current_user_id),
-    db: Client = Depends(get_supabase)
+    db: Client = Depends(get_supabase_admin)
 ):
     """Get financial summary for dashboard"""
     try:
@@ -151,15 +151,44 @@ async def get_financial_summary(
         
         # Market amount calculation
         market_amount = 0.0
-        for inst in installments:
-            if inst["status"] != "PAID":
-                market_amount += float(inst["expected_amount"]) - float(inst["paid_amount"])
+        market_principal = 0.0
+        market_interest = 0.0
+        total_interest_expected = 0.0
         
-        # Add principal for daily rate loans
         for loan in loans:
-            if loan["type"] == "DAILY_RATE" and loan["status"] == "ACTIVE":
-                market_amount += float(loan["principal_amount"])
-        
+            l_principal = float(loan["principal_amount"])
+            if loan["type"] == "TOTAL_RATE":
+                multiplier = float(loan.get("total_rate_multiplier", 1.2))
+                total_repay = l_principal * multiplier
+                l_interest = total_repay - l_principal
+                total_interest_expected += l_interest
+                
+                # Get installments for this loan
+                loan_insts = [i for i in installments if i["loan_id"] == loan["id"]]
+                for inst in loan_insts:
+                    if inst["status"] != "PAID":
+                        # Amortized Principal vs Interest
+                        remaining = float(inst["expected_amount"]) - float(inst["paid_amount"])
+                        market_amount += remaining
+                        market_principal += remaining * (l_principal / total_repay)
+                        market_interest += remaining * (l_interest / total_repay)
+            else:
+                # DAILY_RATE
+                # Total interest expected for Daily Rate is harder to predict as it's recurring, 
+                # but we can sum generated interest
+                loan_insts = [i for i in installments if i["loan_id"] == loan["id"]]
+                total_interest_expected += sum(float(i["expected_amount"]) for i in loan_insts if i["type"] == "INTEREST_ONLY")
+                
+                if loan["status"] == "ACTIVE":
+                    market_amount += l_principal
+                    market_principal += l_principal
+                
+                for inst in loan_insts:
+                    if inst["status"] != "PAID":
+                        remaining = float(inst["expected_amount"]) - float(inst["paid_amount"])
+                        market_amount += remaining
+                        market_interest += remaining
+
         # Cash in hand from transactions
         cash_in_hand = 0.0
         for txn in transactions:
@@ -184,6 +213,9 @@ async def get_financial_summary(
             active_loans=active_loans,
             total_disbursed=total_disbursed,
             market_amount=market_amount,
+            market_principal=market_principal,
+            market_interest=market_interest,
+            total_interest_expected=total_interest_expected,
             cash_in_hand=cash_in_hand,
             total_collected=total_collected,
             overdue_count=overdue_count,

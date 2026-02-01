@@ -8,10 +8,11 @@ const Installments: React.FC = () => {
    const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'OVERDUE' | 'PAID'>('PENDING');
    const [actionLoading, setActionLoading] = useState<string | null>(null);
    const [editModal, setEditModal] = useState<any>(null);
-   const [editPenalty, setEditPenalty] = useState(0);
+   const [editPenalty, setEditPenalty] = useState<string>('0');
 
    // Get days based on frequency
-   const getFrequencyDays = (freq: string): number => {
+   const getFrequencyDays = (freq: any): number => {
+      if (!isNaN(Number(freq)) && freq !== '') return Number(freq);
       switch (freq) {
          case 'DAILY': return 1;
          case 'WEEKLY': return 7;
@@ -168,7 +169,7 @@ const Installments: React.FC = () => {
       setActionLoading(editModal.id);
       try {
          await updateInstallment(editModal.id, {
-            penalty: Number(editPenalty)
+            penalty: Number(editPenalty) || 0
          });
          setEditModal(null);
          alert('Penalty updated successfully!');
@@ -288,8 +289,8 @@ const Installments: React.FC = () => {
                                  </td>
                                  <td className="px-6 py-4 text-center">
                                     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${inst.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' :
-                                          inst.status === 'OVERDUE' ? 'bg-red-100 text-red-700' :
-                                             'bg-blue-50 text-blue-700'
+                                       inst.status === 'OVERDUE' ? 'bg-red-100 text-red-700' :
+                                          'bg-blue-50 text-blue-700'
                                        }`}>
                                        {inst.status === 'PAID' ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
                                        {inst.status}
@@ -364,11 +365,18 @@ const Installments: React.FC = () => {
                      <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Penalty Amount (₹)</label>
                         <input
-                           type="number"
+                           type="text"
                            className="w-full border p-2 rounded-lg"
                            value={editPenalty}
-                           onChange={e => setEditPenalty(Number(e.target.value))}
-                           min={0}
+                           onChange={e => {
+                              let val = e.target.value;
+                              if (val !== '' && !/^\d*\.?\d*$/.test(val)) return;
+                              if (val.length > 1 && val.startsWith('0') && !val.startsWith('0.')) {
+                                 val = val.replace(/^0+/, '');
+                              }
+                              setEditPenalty(val);
+                           }}
+                           placeholder="0"
                         />
                      </div>
                      <div className="flex gap-2 pt-2">

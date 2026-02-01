@@ -10,11 +10,14 @@ class LoanType(str, Enum):
     DAILY_RATE = "DAILY_RATE"
 
 
+# Frequency is now flexible (1-30 days)
 class Frequency(str, Enum):
     DAILY = "DAILY"
     WEEKLY = "WEEKLY"
     BIWEEKLY = "BIWEEKLY"  # 15 days
     MONTHLY = "MONTHLY"
+    # Added flexibility for arbitrary days
+    CUSTOM = "CUSTOM"
 
 
 class LoanStatus(str, Enum):
@@ -37,7 +40,7 @@ class TransactionType(str, Enum):
 # User Schemas
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=8)
+    password: str = Field(..., min_length=6)
     full_name: str
 
 
@@ -62,13 +65,22 @@ class TokenData(BaseModel):
     user_id: Optional[str] = None
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPassword(BaseModel):
+    new_password: str = Field(..., min_length=6)
+    access_token: str
+
+
 # Loan Schemas
 class LoanBase(BaseModel):
     client_name: str
     type: LoanType
     principal_amount: float = Field(..., gt=0)
     start_date: str  # ISO Date string
-    frequency: Frequency
+    frequency: str
     disbursement_date: str
     total_rate_multiplier: Optional[float] = None
     tenure: Optional[int] = None
@@ -157,6 +169,9 @@ class FinancialSummary(BaseModel):
     active_loans: int
     total_disbursed: float
     market_amount: float
+    market_principal: float
+    market_interest: float
+    total_interest_expected: float
     cash_in_hand: float
     total_collected: float
     overdue_count: int

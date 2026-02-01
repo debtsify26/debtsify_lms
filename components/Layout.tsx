@@ -10,7 +10,10 @@ import {
   Menu,
   X,
   LogOut,
-  User
+  User,
+  Landmark,
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -36,8 +39,8 @@ const NavItem = ({
   <button
     onClick={() => onClick(view)}
     className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg transition-colors ${current === view
-        ? 'bg-primary-600 text-white shadow-md'
-        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+      ? 'bg-primary-600 text-white shadow-md'
+      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
       }`}
   >
     <Icon size={20} />
@@ -46,12 +49,26 @@ const NavItem = ({
 );
 
 const Layout: React.FC<LayoutProps> = ({ currentView, setView, children, userName = 'User' }) => {
+  const [isSyncing, setIsSyncing] = useState(false);
   const { logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     if (confirm('Are you sure you want to logout?')) {
       await logout();
+    }
+  };
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      const { syncAPI } = await import('../services/api');
+      const result = await syncAPI.syncData();
+      alert(`Sync successful! Spreadsheet: ${result.spreadsheet_url}`);
+    } catch (err: any) {
+      alert(`Sync failed: ${err.message}`);
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -69,6 +86,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, setView, children, userNam
           <NavItem view="LOANS" current={currentView} label="Loans" icon={Users} onClick={setView} />
           <NavItem view="INSTALLMENTS" current={currentView} label="Schedule" icon={CalendarDays} onClick={setView} />
           <NavItem view="LEDGER" current={currentView} label="Ledger" icon={BookOpen} onClick={setView} />
+          <NavItem view="INVESTMENT_ANALYTICS" current={currentView} label="Market Analytics" icon={Landmark} onClick={setView} />
           <NavItem view="AI_ANALYST" current={currentView} label="AI Analyst" icon={Bot} onClick={setView} />
         </nav>
 
@@ -77,6 +95,15 @@ const Layout: React.FC<LayoutProps> = ({ currentView, setView, children, userNam
             <User size={16} className="text-primary-400" />
             <span className="text-sm truncate">{userName}</span>
           </div>
+
+          <button
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="flex items-center gap-3 w-full px-4 py-2 text-slate-300 hover:text-white transition-colors text-sm disabled:opacity-50"
+          >
+            <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
+            {isSyncing ? 'Syncing...' : 'Sync to Cloud'}
+          </button>
           <button
             onClick={handleLogout}
             className="flex items-center gap-3 w-full px-4 py-2 text-red-400 hover:text-red-300 transition-colors text-sm"
@@ -102,6 +129,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, setView, children, userNam
           <NavItem view="LOANS" current={currentView} label="Loans" icon={Users} onClick={(v) => { setView(v); setIsMobileMenuOpen(false) }} />
           <NavItem view="INSTALLMENTS" current={currentView} label="Schedule" icon={CalendarDays} onClick={(v) => { setView(v); setIsMobileMenuOpen(false) }} />
           <NavItem view="LEDGER" current={currentView} label="Ledger" icon={BookOpen} onClick={(v) => { setView(v); setIsMobileMenuOpen(false) }} />
+          <NavItem view="INVESTMENT_ANALYTICS" current={currentView} label="Market Analytics" icon={Landmark} onClick={(v) => { setView(v); setIsMobileMenuOpen(false) }} />
           <NavItem view="AI_ANALYST" current={currentView} label="AI Analyst" icon={Bot} onClick={(v) => { setView(v); setIsMobileMenuOpen(false) }} />
           <div className="pt-8 border-t border-slate-800 mt-4 space-y-4">
             <div className="flex items-center gap-3 px-4 py-2 text-white">

@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from datetime import timedelta
 from supabase import Client
 from database import get_supabase, get_supabase_admin
-from schemas import UserCreate, UserLogin, Token, UserResponse
+from schemas import UserCreate, UserLogin, Token, UserResponse, ForgotPasswordRequest, ResetPassword
 from auth import (
     get_password_hash,
     verify_password,
@@ -11,7 +11,7 @@ from auth import (
 )
 from config import settings
 
-router = APIRouter(prefix="/auth", tags=["Authentication"])
+router = APIRouter(tags=["Authentication"])
 
 
 @router.post("/signup", response_model=Token, status_code=status.HTTP_201_CREATED)
@@ -138,4 +138,51 @@ async def logout(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Logout failed: {str(e)}"
+        )
+@router.post("/forgot-password")
+async def forgot_password(
+    request: ForgotPasswordRequest,
+    db: Client = Depends(get_supabase)
+):
+    """Send a password reset email"""
+    try:
+        # Supabase sends the email automatically
+        db.auth.reset_password_email(request.email)
+        return {"message": "Password reset email sent. Please check your inbox."}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send reset email: {str(e)}"
+        )
+@router.post("/reset-password")
+async def reset_password(
+    request: ResetPassword,
+    db: Client = Depends(get_supabase)
+):
+    """Update user password using the link from email"""
+    try:
+        # We need to set the session using the access token first
+        # Supabase Python client's auth.update_user handles the update 
+        # but we need to verify the token is valid for the current session.
+        # However, FastAPI is stateless. We'll use the supabase admin client 
+        # if we need to bypass or the regular client if the token is passed.
+        
+        # Validating/Setting session with provided token
+        db.auth.set_session(request.access_token, "") 
+        
+        auth_response = db.auth.update_user({
+            "password": request.new_password
+        })
+        
+        if not auth_response.user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to reset password. Link might be expired."
+            )
+            
+        return {"message": "Password updated successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Password reset failed: {str(e)}"
         )

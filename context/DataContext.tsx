@@ -17,8 +17,9 @@ interface DataContextType {
   deleteInstallment: (id: string) => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, 'id' | 'created_at'>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
+  financialSummary: any | null;
   refreshData: () => Promise<void>;
-  getFinancialSummary: () => {
+  localSummary: () => {
     marketAmount: number;
     cashInHand: number;
     totalDisbursed: number;
@@ -32,6 +33,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loans, setLoans] = useState<Loan[]>([]);
   const [installments, setInstallments] = useState<Installment[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [financialSummary, setFinancialSummary] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,15 +50,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setError(null);
 
     try {
-      const [loansData, installmentsData, transactionsData] = await Promise.all([
+      const [loansData, installmentsData, transactionsData, summaryData] = await Promise.all([
         loansAPI.getAll(),
         installmentsAPI.getAll(),
         transactionsAPI.getAll(),
+        transactionsAPI.getFinancialSummary()
       ]);
 
       setLoans(loansData);
       setInstallments(installmentsData);
       setTransactions(transactionsData);
+      setFinancialSummary(summaryData);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch data');
       console.error('Error fetching data:', err);
@@ -76,7 +80,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const newLoan = await loansAPI.create(loanData);
       setLoans((prev) => [...prev, newLoan]);
-      return newLoan; // Return the created loan so component can get the ID
+      await refreshData(); // Refresh summary after adding
+      return newLoan;
     } catch (err: any) {
       setError(err.message || 'Failed to create loan');
       throw err;
@@ -88,6 +93,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const updatedLoan = await loansAPI.update(id, updates);
       setLoans((prev) => prev.map((l) => (l.id === id ? updatedLoan : l)));
+      await refreshData();
     } catch (err: any) {
       setError(err.message || 'Failed to update loan');
       throw err;
@@ -101,6 +107,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setLoans((prev) => prev.filter((l) => l.id !== id));
       // Also remove related installments
       setInstallments((prev) => prev.filter((i) => i.loan_id !== id));
+      await refreshData();
     } catch (err: any) {
       setError(err.message || 'Failed to delete loan');
       throw err;
@@ -113,6 +120,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const created = await installmentsAPI.bulkCreate(newInstallments);
       setInstallments((prev) => [...prev, ...created]);
+      await refreshData();
     } catch (err: any) {
       setError(err.message || 'Failed to create installments');
       throw err;
@@ -124,6 +132,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const updated = await installmentsAPI.update(id, updates);
       setInstallments((prev) => prev.map((i) => (i.id === id ? updated : i)));
+      await refreshData();
     } catch (err: any) {
       setError(err.message || 'Failed to update installment');
       throw err;
@@ -147,6 +156,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const newTransaction = await transactionsAPI.create(transactionData);
       setTransactions((prev) => [newTransaction, ...prev]); // Newest first
+      await refreshData();
     } catch (err: any) {
       setError(err.message || 'Failed to create transaction');
       throw err;
@@ -164,8 +174,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // Financial summary (local calculation)
-  const getFinancialSummary = () => {
+  // Local financial summary calculation
+  const localSummary = () => {
     const activeLoans = loans.filter(l => l.status === 'ACTIVE');
 
     const marketAmount = activeLoans.reduce((sum, loan) => {
@@ -177,21 +187,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return sum;
     }, 0);
 
-    const credits = transactions
-      .filter(t => t.type === 'CREDIT')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const debits = transactions
-      .filter(t => t.type === 'DEBIT')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const cashInHand = credits - debits;
+    const totalCollected = installments.reduce((sum, inst) => sum + (inst.paid_amount || 0), 0);
 
     const totalDisbursed = activeLoans.reduce((sum, loan) => sum + loan.principal_amount, 0);
 
     return {
       marketAmount,
-      cashInHand,
+      totalCollected,
       totalDisbursed,
     };
   };
@@ -211,7 +213,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     addTransaction,
     deleteTransaction,
     refreshData,
-    getFinancialSummary,
+    localSummary,
+    financialSummary,
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
