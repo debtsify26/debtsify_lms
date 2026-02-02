@@ -80,7 +80,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const newLoan = await loansAPI.create(loanData);
       setLoans((prev) => [...prev, newLoan]);
-      await refreshData(); // Refresh summary after adding
+      // Remove redundant refreshData() call
       return newLoan;
     } catch (err: any) {
       setError(err.message || 'Failed to create loan');
@@ -93,7 +93,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const updatedLoan = await loansAPI.update(id, updates);
       setLoans((prev) => prev.map((l) => (l.id === id ? updatedLoan : l)));
-      await refreshData();
     } catch (err: any) {
       setError(err.message || 'Failed to update loan');
       throw err;
@@ -107,7 +106,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setLoans((prev) => prev.filter((l) => l.id !== id));
       // Also remove related installments
       setInstallments((prev) => prev.filter((i) => i.loan_id !== id));
-      await refreshData();
     } catch (err: any) {
       setError(err.message || 'Failed to delete loan');
       throw err;
@@ -120,7 +118,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const created = await installmentsAPI.bulkCreate(newInstallments);
       setInstallments((prev) => [...prev, ...created]);
-      await refreshData();
     } catch (err: any) {
       setError(err.message || 'Failed to create installments');
       throw err;
@@ -132,7 +129,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const updated = await installmentsAPI.update(id, updates);
       setInstallments((prev) => prev.map((i) => (i.id === id ? updated : i)));
-      await refreshData();
     } catch (err: any) {
       setError(err.message || 'Failed to update installment');
       throw err;
@@ -156,7 +152,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const newTransaction = await transactionsAPI.create(transactionData);
       setTransactions((prev) => [newTransaction, ...prev]); // Newest first
-      await refreshData();
     } catch (err: any) {
       setError(err.message || 'Failed to create transaction');
       throw err;

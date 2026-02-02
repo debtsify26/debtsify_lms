@@ -4,7 +4,7 @@ import { LoanType, Frequency, LoanStatus } from '../types';
 import { Plus, Search, Loader2, Pencil, Trash2, Download, X, ChevronUp, ChevronDown } from 'lucide-react';
 
 const Loans: React.FC = () => {
-  const { loans, addLoan, updateLoan, deleteLoan, addInstallments, addTransaction, isLoading } = useData();
+  const { loans, addLoan, updateLoan, deleteLoan, addInstallments, addTransaction, isLoading, refreshData } = useData();
   const [showModal, setShowModal] = useState(false);
   const [editingLoan, setEditingLoan] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -147,7 +147,8 @@ const Loans: React.FC = () => {
 
     try {
       await deleteLoan(loanId);
-      alert('Loan deleted successfully!');
+      // alert('Loan deleted successfully!'); // Removing alert for smoother UX, can be added back if preferred
+      await refreshData();
     } catch (error: any) {
       alert(`Error deleting loan: ${error.message}`);
     }
@@ -178,13 +179,13 @@ const Loans: React.FC = () => {
       if (editingLoan) {
         // Update existing loan
         await updateLoan(editingLoan.id, loanData);
-        alert('Loan updated successfully!');
+        // alert('Loan updated successfully!');
       } else {
         // Create new loan
         const createdLoan = await addLoan(loanData);
         const loanId = createdLoan.id;
 
-        // Add Transaction for Disbursement
+        // Add Transaction for Disbursement - these are now sequential but fast
         await addTransaction({
           date: new Date().toISOString(),
           amount: Number(principal),
@@ -240,6 +241,9 @@ const Loans: React.FC = () => {
           await addInstallments(newInstallments);
         }
       }
+
+      // Final single refresh to update everything (especially financial summary)
+      await refreshData();
 
       setShowModal(false);
       resetForm();

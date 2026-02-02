@@ -70,11 +70,17 @@ CREATE TABLE IF NOT EXISTS public.transactions (
 -- Indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_loans_user_id ON public.loans(user_id);
 CREATE INDEX IF NOT EXISTS idx_loans_status ON public.loans(status);
+CREATE INDEX IF NOT EXISTS idx_loans_user_status ON public.loans(user_id, status);
+
 CREATE INDEX IF NOT EXISTS idx_installments_user_id ON public.installments(user_id);
 CREATE INDEX IF NOT EXISTS idx_installments_loan_id ON public.installments(loan_id);
 CREATE INDEX IF NOT EXISTS idx_installments_status ON public.installments(status);
+CREATE INDEX IF NOT EXISTS idx_installments_user_loan_due ON public.installments(user_id, loan_id, due_date);
+CREATE INDEX IF NOT EXISTS idx_installments_user_status_due ON public.installments(user_id, status, due_date);
+
 CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON public.transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON public.transactions(date);
+CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON public.transactions(user_id, date DESC);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

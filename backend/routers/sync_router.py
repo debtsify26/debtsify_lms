@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
 import gspread
 from google.oauth2.service_account import Credentials
 import json
@@ -6,7 +6,7 @@ from supabase import Client
 from database import get_supabase_admin
 from auth import get_current_user_id
 from config import settings
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 router = APIRouter(prefix="/sync", tags=["Sync"])
 
@@ -33,12 +33,8 @@ def get_gspread_client():
             detail=f"Failed to authorize Google Sheets: {str(e)}"
         )
 
-@router.post("")
-async def sync_data(
-    user_id: str = Depends(get_current_user_id),
-    db: Client = Depends(get_supabase_admin)
-):
-    """Sync all user data to Google Sheets"""
+def perform_sync(user_id: str, db: Client):
+    """Actual sync logic to be run in background"""
     try:
         client = get_gspread_client()
         
@@ -46,9 +42,8 @@ async def sync_data(
         if settings.google_spreadsheet_id:
             spreadsheet = client.open_by_key(settings.google_spreadsheet_id)
         else:
+            # Note: client.create might be slow, but it's in background now
             spreadsheet = client.create(f"Debtsify_Sync_{user_id}")
-            # You might want to share this with the user's email if possible
-            # spreadsheet.share('user@email.com', perm_type='user', role='writer')
         
         # 1. Sync Loans
         loans_response = db.table("loans").select("*").eq("user_id", user_id).execute()
@@ -62,17 +57,25 @@ async def sync_data(
         transactions_response = db.table("transactions").select("*").eq("user_id", user_id).execute()
         sync_to_sheet(spreadsheet, "Transactions", transactions_response.data)
         
-        return {
-            "message": "Data synced successfully",
-            "spreadsheet_id": spreadsheet.id,
-            "spreadsheet_url": f"https://docs.google.com/spreadsheets/d/{spreadsheet.id}"
-        }
+        print(f"Sync completed successfully for user {user_id}")
         
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Sync failed: {str(e)}"
-        )
+        print(f"Background sync failed for user {user_id}: {str(e)}")
+
+@router.post("")
+async def sync_data(
+    background_tasks: BackgroundTasks,
+    user_id: str = Depends(get_current_user_id),
+    db: Client = Depends(get_supabase_admin)
+):
+    """Sync all user data to Google Sheets in the background"""
+    # Start the background task
+    background_tasks.add_task(perform_sync, user_id, db)
+    
+    return {
+        "message": "Sync started in background",
+        "status": "processing"
+    }
 
 def sync_to_sheet(spreadsheet, sheet_name: str, data: list):
     try:
