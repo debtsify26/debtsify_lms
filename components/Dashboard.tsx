@@ -1,17 +1,6 @@
 import React from 'react';
 import { useData } from '../context/DataContext';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell
-} from 'recharts';
+
 import { TrendingUp, TrendingDown, Wallet, Loader2 } from 'lucide-react';
 
 const KPICard = ({ title, amount, icon: Icon, color }: any) => (
@@ -31,27 +20,80 @@ const KPICard = ({ title, amount, icon: Icon, color }: any) => (
 const Dashboard: React.FC = () => {
   const { localSummary, installments, transactions, addTransaction, refreshData, isLoading } = useData();
   const summary = localSummary();
-  const [showExpenseModal, setShowExpenseModal] = React.useState(false);
-  const [expenseAmount, setExpenseAmount] = React.useState('');
-  const [expenseDescription, setExpenseDescription] = React.useState('');
-  const [expenseCategory, setExpenseCategory] = React.useState('Business Expense');
+  const [showTransModal, setShowTransModal] = React.useState(false);
+  const [transType, setTransType] = React.useState<'CREDIT' | 'DEBIT'>('DEBIT');
+  const [transAmount, setTransAmount] = React.useState('');
+  const [transDescription, setTransDescription] = React.useState('');
+  const [transCategory, setTransCategory] = React.useState('Business Expense');
+  const [transDate, setTransDate] = React.useState(new Date().toISOString().split('T')[0]);
+  const [transEndDate, setTransEndDate] = React.useState('');
+  const [isDateRange, setIsDateRange] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const handleAddExpense = async (e: React.FormEvent) => {
+  const openTransModal = (type: 'CREDIT' | 'DEBIT') => {
+    setTransType(type);
+    setTransCategory(type === 'DEBIT' ? 'Business Expense' : 'Business Income');
+    const today = new Date().toISOString().split('T')[0];
+    setTransDate(today);
+    setTransEndDate(today);
+    setIsDateRange(false);
+    setTransAmount('');
+    setTransDescription('');
+    setShowTransModal(true);
+  };
+
+  const handleAddTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    const dates: Date[] = [];
     try {
-      await addTransaction({
-        date: new Date().toISOString(),
-        amount: Number(expenseAmount),
-        type: 'DEBIT',
-        category: expenseCategory,
-        description: expenseDescription
-      });
+      if (isDateRange && transEndDate) {
+        const start = new Date(transDate);
+        const end = new Date(transEndDate);
+
+        // Loop from start to end (inclusive)
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          dates.push(new Date(d));
+        }
+
+        if (dates.length === 0 && start.getTime() <= end.getTime()) {
+          // Fallback if loop didn't run (e.g. same day)
+          dates.push(start);
+        } else if (dates.length === 0) {
+          throw new Error("End date must be after Start date");
+        }
+
+        // Create a transaction for each date
+        await Promise.all(dates.map(date =>
+          addTransaction({
+            date: date.toISOString(),
+            amount: Number(transAmount),
+            type: transType,
+            category: transCategory,
+            description: transDescription
+          })
+        ));
+      } else {
+        // Single transaction
+        await addTransaction({
+          date: new Date(transDate).toISOString(),
+          amount: Number(transAmount),
+          type: transType,
+          category: transCategory,
+          description: transDescription
+        });
+      }
+
       await refreshData();
-      setShowExpenseModal(false);
-      setExpenseAmount('');
-      setExpenseDescription('');
+      setShowTransModal(false);
+      setTransAmount('');
+      setTransDescription('');
+
+      if (isDateRange) {
+        alert(`Successfully added ${dates.length} transactions.`);
+      } else {
+        alert('Transaction added successfully.');
+      }
     } catch (err: any) {
       alert(`Error: ${err.message}`);
     } finally {
@@ -107,12 +149,20 @@ const Dashboard: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
         <h2 className="text-xl font-bold text-slate-800">Financial Overview</h2>
-        <button
-          onClick={() => setShowExpenseModal(true)}
-          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm flex items-center gap-2"
-        >
-          <TrendingDown size={18} /> Add Expense
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => openTransModal('CREDIT')}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm flex items-center gap-2"
+          >
+            <TrendingUp size={18} /> Add Inflow
+          </button>
+          <button
+            onClick={() => openTransModal('DEBIT')}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm flex items-center gap-2"
+          >
+            <TrendingDown size={18} /> Add Expense
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -142,56 +192,116 @@ const Dashboard: React.FC = () => {
         />
       </div>
 
-      {showExpenseModal && (
+      {showTransModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-slate-800">Add New Expense</h3>
-              <button onClick={() => setShowExpenseModal(false)} className="text-slate-400 hover:text-slate-600">
+              <h3 className={`text-xl font-bold ${transType === 'CREDIT' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                {transType === 'CREDIT' ? 'Add Inflow' : 'Add Expense'}
+              </h3>
+              <button onClick={() => setShowTransModal(false)} className="text-slate-400 hover:text-slate-600">
                 <TrendingDown size={24} className="rotate-45" />
               </button>
             </div>
-            <form onSubmit={handleAddExpense} className="space-y-4">
+            <form onSubmit={handleAddTransaction} className="space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  type="checkbox"
+                  id="dateRange"
+                  checked={isDateRange}
+                  onChange={e => setIsDateRange(e.target.checked)}
+                  className="w-4 h-4 text-primary-600 rounded border-slate-300 focus:ring-primary-500"
+                />
+                <label htmlFor="dateRange" className="text-sm font-medium text-slate-700 select-none">Add for Date Range</label>
+              </div>
+
+              {!isDateRange ? (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
+                  <input
+                    required
+                    type="date"
+                    className="w-full border p-2 rounded-lg"
+                    value={transDate}
+                    onChange={e => setTransDate(e.target.value)}
+                  />
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
+                    <input
+                      required
+                      type="date"
+                      className="w-full border p-2 rounded-lg"
+                      value={transDate}
+                      onChange={e => setTransDate(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
+                    <input
+                      required
+                      type="date"
+                      className="w-full border p-2 rounded-lg"
+                      value={transEndDate}
+                      onChange={e => setTransEndDate(e.target.value)}
+                      min={transDate}
+                    />
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
                 <input
                   required
                   type="text"
                   className="w-full border p-2 rounded-lg"
-                  placeholder="e.g. Office Rent, Tea/Coffee"
-                  value={expenseDescription}
-                  onChange={e => setExpenseDescription(e.target.value)}
+                  placeholder={transType === 'CREDIT' ? "e.g. Service Fee, Sales" : "e.g. Office Rent, Tea/Coffee"}
+                  value={transDescription}
+                  onChange={e => setTransDescription(e.target.value)}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Amount (₹)</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Amount (₹) {isDateRange && <span className="text-xs text-slate-400 block font-normal">(Per Day)</span>}</label>
                   <input
                     required
                     type="number"
                     className="w-full border p-2 rounded-lg"
                     placeholder="0"
-                    value={expenseAmount}
-                    onChange={e => setExpenseAmount(e.target.value)}
+                    value={transAmount}
+                    onChange={e => setTransAmount(e.target.value)}
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
                   <select
                     className="w-full border p-2 rounded-lg"
-                    value={expenseCategory}
-                    onChange={e => setExpenseCategory(e.target.value)}
+                    value={transCategory}
+                    onChange={e => setTransCategory(e.target.value)}
                   >
-                    <option value="Business Expense">Business</option>
-                    <option value="Personal Expense">Personal</option>
-                    <option value="Expense">Other</option>
+                    {transType === 'DEBIT' ? (
+                      <>
+                        <option value="Business Expense">Business</option>
+                        <option value="Personal Expense">Personal</option>
+                        <option value="Expense">Other</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="Business Income">Business</option>
+                        <option value="Personal Income">Personal</option>
+                        <option value="Income">Other</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>
               <div className="flex gap-2 pt-4">
                 <button
                   type="button"
-                  onClick={() => setShowExpenseModal(false)}
+                  onClick={() => setShowTransModal(false)}
                   className="flex-1 py-2 text-slate-600 hover:bg-slate-100 rounded-lg"
                   disabled={isSubmitting}
                 >
@@ -199,10 +309,15 @@ const Dashboard: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+                  className={`flex-1 py-2 text-white rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50 ${transType === 'CREDIT' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'}`}
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : 'Record Expense'}
+                  {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : (
+                    <>
+                      {transType === 'CREDIT' ? 'Record Inflow' : 'Record Expense'}
+                      {isDateRange && <span className="text-xs opacity-75">(Multiple)</span>}
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -210,55 +325,7 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Cash Flow Chart */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 h-80">
-          <h4 className="text-lg font-bold text-slate-800 mb-4">Monthly Cash Flow</h4>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={monthlyFlow}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="name" axisLine={false} tickLine={false} />
-              <YAxis axisLine={false} tickLine={false} />
-              <Tooltip />
-              <Bar dataKey="Inflow" fill="#06b6d4" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Outflow" fill="#94a3b8" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
 
-        {/* Status Pie Chart */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 h-80 flex flex-col">
-          <h4 className="text-lg font-bold text-slate-800 mb-4">Installment Status</h4>
-          <div className="flex-1 min-h-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={statusData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {statusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex justify-center gap-4 text-xs text-slate-500 mt-2">
-            {statusData.map((entry, index) => (
-              <div key={index} className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[index] }} />
-                <span>{entry.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
 
       {/* Upcoming List */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">

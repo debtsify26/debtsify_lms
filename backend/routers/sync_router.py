@@ -54,6 +54,17 @@ def perform_sync(user_id: str, db: Client, create_monthly_archive: bool = False)
             except gspread.exceptions.SpreadsheetNotFound:
                 spreadsheet = client.create(title)
         
+        # Share with user's email
+        try:
+            user_data = db.table("users").select("email").eq("id", user_id).single().execute()
+            if user_data and user_data.data and user_data.data.get("email"):
+                user_email = user_data.data.get("email")
+                print(f"Sharing spreadsheet with {user_email}...")
+                spreadsheet.share(user_email, perm_type='user', role='writer')
+        except Exception as share_error:
+            print(f"Warning: Failed to share spreadsheet with user: {str(share_error)}")
+
+        
         sync_to_sheet(spreadsheet, "Loans", loans_response.data)
         sync_to_sheet(spreadsheet, "Installments", installments_response.data)
         sync_to_sheet(spreadsheet, "Transactions", transactions_response.data)
@@ -92,6 +103,16 @@ def perform_sync(user_id: str, db: Client, create_monthly_archive: bool = False)
                     # Create new monthly archive
                     archive_sheet = client.create(archive_title)
                     print(f"Created new monthly archive: {archive_title}")
+                
+                # Share archive with user's email
+                try:
+                    user_data = db.table("users").select("email").eq("id", user_id).single().execute()
+                    if user_data and user_data.data and user_data.data.get("email"):
+                        user_email = user_data.data.get("email")
+                        print(f"Sharing archive with {user_email}...")
+                        archive_sheet.share(user_email, perm_type='user', role='writer')
+                except Exception as share_error:
+                    print(f"Warning: Failed to share archive with user: {str(share_error)}")
                 
                 # Sync data to archive
                 sync_to_sheet(archive_sheet, "Loans", loans_response.data)

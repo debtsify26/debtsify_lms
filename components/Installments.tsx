@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { LoanType, Frequency } from '../types';
-import { CheckCircle2, AlertCircle, RotateCcw, DollarSign, Calendar, Loader2, Download, Pencil } from 'lucide-react';
+import { CheckCircle2, AlertCircle, RotateCcw, DollarSign, Calendar, Loader2, Download, Pencil, Search } from 'lucide-react';
 
 const Installments: React.FC = () => {
    const { installments, updateInstallment, addTransaction, loans, addInstallments, updateLoan, isLoading } = useData();
    const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'OVERDUE' | 'PAID'>('PENDING');
+   const [searchTerm, setSearchTerm] = useState('');
    const [actionLoading, setActionLoading] = useState<string | null>(null);
    const [editModal, setEditModal] = useState<any>(null);
    const [editPenalty, setEditPenalty] = useState<string>('0');
@@ -23,7 +24,12 @@ const Installments: React.FC = () => {
    };
 
    const filtered = installments
-      .filter(i => filter === 'ALL' ? true : i.status === filter)
+      .filter(i => {
+         const matchesStatus = filter === 'ALL' ? true : i.status === filter;
+         const clientName = i.client_name || i.clientName || '';
+         const matchesSearch = clientName.toLowerCase().includes(searchTerm.toLowerCase());
+         return matchesStatus && matchesSearch;
+      })
       .sort((a, b) => new Date(a.due_date || a.dueDate).getTime() - new Date(b.due_date || b.dueDate).getTime());
 
    const handlePay = async (inst: any) => {
@@ -227,19 +233,29 @@ const Installments: React.FC = () => {
       <div className="space-y-6">
          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <h2 className="text-2xl font-bold text-slate-800">Installment Schedule</h2>
-            <div className="flex gap-2 items-center">
+            <div className="flex flex-wrap gap-2 items-center w-full sm:w-auto">
+               <div className="relative flex-grow sm:flex-grow-0">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <input
+                     type="text"
+                     placeholder="Search Client..."
+                     className="pl-9 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm w-full"
+                     value={searchTerm}
+                     onChange={e => setSearchTerm(e.target.value)}
+                  />
+               </div>
                <button
                   onClick={exportToExcel}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors shadow-sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors shadow-sm text-sm"
                >
-                  <Download size={18} /> Export
+                  <Download size={16} /> Export
                </button>
-               <div className="flex bg-slate-100 p-1 rounded-lg">
+               <div className="flex bg-slate-100 p-1 rounded-lg overflow-x-auto max-w-full">
                   {['ALL', 'PENDING', 'OVERDUE', 'PAID'].map(f => (
                      <button
                         key={f}
                         onClick={() => setFilter(f as any)}
-                        className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${filter === f ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-all whitespace-nowrap ${filter === f ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                      >
                         {f}
                      </button>

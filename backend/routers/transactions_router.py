@@ -47,7 +47,7 @@ async def create_transaction(
 @router.get("", response_model=List[TransactionResponse])
 async def get_transactions(
     type_filter: str | None = None,
-    limit: int = 100,
+    limit: int = 5000,
     user_id: str = Depends(get_current_user_id),
     db: Client = Depends(get_supabase_admin)
 ):

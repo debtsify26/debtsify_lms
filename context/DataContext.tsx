@@ -184,24 +184,21 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return sum;
     }, 0);
 
-    const totalInflow = installments.reduce((sum, inst) => sum + (inst.paid_amount || 0), 0);
-    const totalCollected = totalInflow;
+    const totalInflow = transactions
+      .filter(t => t.type === 'CREDIT')
+      .reduce((sum, t) => sum + t.amount, 0);
 
+    // totalDisbursed is used for Market Amount stats, but NOT for Cash Flow (since it's in transactions)
     const totalDisbursed = loans.reduce((sum, loan) => sum + loan.principal_amount, 0);
 
-    const cashInHand = transactions.reduce((sum, t) => {
-      return t.type === 'CREDIT' ? sum + t.amount : sum - t.amount;
-    }, 0);
+    const totalDebits = transactions
+      .filter(t => t.type === 'DEBIT')
+      .reduce((sum, t) => sum + t.amount, 0);
 
-    const totalPayouts = transactions
-      .filter(t => t.category === 'Payout')
-      .reduce((s, t) => s + t.amount, 0);
+    // Outflow is just Debits (includes expenses + loan disbursements)
+    const totalOutflow = totalDebits;
 
-    const totalExpenses = transactions
-      .filter(t => ['Personal Expense', 'Business Expense', 'Expense'].includes(t.category))
-      .reduce((s, t) => s + t.amount, 0);
-
-    const totalOutflow = totalDisbursed + totalPayouts + totalExpenses;
+    const cashInHand = totalInflow - totalOutflow;
 
     return {
       marketAmount,
