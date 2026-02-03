@@ -29,8 +29,35 @@ const KPICard = ({ title, amount, icon: Icon, color }: any) => (
 );
 
 const Dashboard: React.FC = () => {
-  const { localSummary, installments, transactions, isLoading } = useData();
+  const { localSummary, installments, transactions, addTransaction, refreshData, isLoading } = useData();
   const summary = localSummary();
+  const [showExpenseModal, setShowExpenseModal] = React.useState(false);
+  const [expenseAmount, setExpenseAmount] = React.useState('');
+  const [expenseDescription, setExpenseDescription] = React.useState('');
+  const [expenseCategory, setExpenseCategory] = React.useState('Business Expense');
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const handleAddExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await addTransaction({
+        date: new Date().toISOString(),
+        amount: Number(expenseAmount),
+        type: 'DEBIT',
+        category: expenseCategory,
+        description: expenseDescription
+      });
+      await refreshData();
+      setShowExpenseModal(false);
+      setExpenseAmount('');
+      setExpenseDescription('');
+    } catch (err: any) {
+      alert(`Error: ${err.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -40,7 +67,7 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  // Prepare Chart Data
+  // ... (prepare chart data remains same)
   const now = new Date();
   const monthlyFlow = Array.from({ length: 6 }).map((_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -78,18 +105,34 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+        <h2 className="text-xl font-bold text-slate-800">Financial Overview</h2>
+        <button
+          onClick={() => setShowExpenseModal(true)}
+          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm flex items-center gap-2"
+        >
+          <TrendingDown size={18} /> Add Expense
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPICard
+          title="Total Inflow"
+          amount={summary.totalInflow}
+          icon={TrendingUp}
+          color="bg-emerald-500"
+        />
+        <KPICard
+          title="Total Outflow"
+          amount={summary.totalOutflow}
+          icon={TrendingDown}
+          color="bg-rose-500"
+        />
         <KPICard
           title="Amount in Market"
           amount={summary.marketAmount}
-          icon={TrendingUp}
-          color="bg-blue-500"
-        />
-        <KPICard
-          title="Total Collected"
-          amount={summary.totalCollected}
           icon={Wallet}
-          color="bg-emerald-500"
+          color="bg-blue-500"
         />
         <KPICard
           title="Total Disbursed"
@@ -98,6 +141,74 @@ const Dashboard: React.FC = () => {
           color="bg-slate-700"
         />
       </div>
+
+      {showExpenseModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-slate-800">Add New Expense</h3>
+              <button onClick={() => setShowExpenseModal(false)} className="text-slate-400 hover:text-slate-600">
+                <TrendingDown size={24} className="rotate-45" />
+              </button>
+            </div>
+            <form onSubmit={handleAddExpense} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                <input
+                  required
+                  type="text"
+                  className="w-full border p-2 rounded-lg"
+                  placeholder="e.g. Office Rent, Tea/Coffee"
+                  value={expenseDescription}
+                  onChange={e => setExpenseDescription(e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Amount (₹)</label>
+                  <input
+                    required
+                    type="number"
+                    className="w-full border p-2 rounded-lg"
+                    placeholder="0"
+                    value={expenseAmount}
+                    onChange={e => setExpenseAmount(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
+                  <select
+                    className="w-full border p-2 rounded-lg"
+                    value={expenseCategory}
+                    onChange={e => setExpenseCategory(e.target.value)}
+                  >
+                    <option value="Business Expense">Business</option>
+                    <option value="Personal Expense">Personal</option>
+                    <option value="Expense">Other</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowExpenseModal(false)}
+                  className="flex-1 py-2 text-slate-600 hover:bg-slate-100 rounded-lg"
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : 'Record Expense'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Cash Flow Chart */}

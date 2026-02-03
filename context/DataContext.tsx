@@ -23,6 +23,8 @@ interface DataContextType {
     marketAmount: number;
     cashInHand: number;
     totalDisbursed: number;
+    totalInflow: number;
+    totalOutflow: number;
   };
 }
 
@@ -182,14 +184,31 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return sum;
     }, 0);
 
-    const totalCollected = installments.reduce((sum, inst) => sum + (inst.paid_amount || 0), 0);
+    const totalInflow = installments.reduce((sum, inst) => sum + (inst.paid_amount || 0), 0);
+    const totalCollected = totalInflow;
 
-    const totalDisbursed = activeLoans.reduce((sum, loan) => sum + loan.principal_amount, 0);
+    const totalDisbursed = loans.reduce((sum, loan) => sum + loan.principal_amount, 0);
+
+    const cashInHand = transactions.reduce((sum, t) => {
+      return t.type === 'CREDIT' ? sum + t.amount : sum - t.amount;
+    }, 0);
+
+    const totalPayouts = transactions
+      .filter(t => t.category === 'Payout')
+      .reduce((s, t) => s + t.amount, 0);
+
+    const totalExpenses = transactions
+      .filter(t => ['Personal Expense', 'Business Expense', 'Expense'].includes(t.category))
+      .reduce((s, t) => s + t.amount, 0);
+
+    const totalOutflow = totalDisbursed + totalPayouts + totalExpenses;
 
     return {
       marketAmount,
-      totalCollected,
+      cashInHand,
       totalDisbursed,
+      totalInflow,
+      totalOutflow
     };
   };
 

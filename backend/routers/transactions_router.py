@@ -197,9 +197,16 @@ async def get_financial_summary(
             else:
                 cash_in_hand -= float(txn["amount"])
         
-        # Total collected (sum of paid installments)
-        total_collected = sum(float(inst["paid_amount"]) for inst in installments)
+        # Total collected (sum of paid installments) -> This is our INFLOW
+        total_inflow = sum(float(inst["paid_amount"]) for inst in installments)
+        total_collected = total_inflow
         
+        # Outflow Logic: Actual Money Spent (Disbursed Principal + Payouts + Expenses)
+        total_payouts = sum(float(txn["amount"]) for txn in transactions if txn["category"] == "Payout")
+        total_expenses = sum(float(txn["amount"]) for txn in transactions if txn["category"] in ["Personal Expense", "Business Expense", "Expense"])
+        
+        total_outflow = total_disbursed + total_payouts + total_expenses
+
         # Overdue metrics
         overdue_installments = [inst for inst in installments if inst["status"] == "OVERDUE"]
         overdue_count = len(overdue_installments)
@@ -218,6 +225,8 @@ async def get_financial_summary(
             total_interest_expected=total_interest_expected,
             cash_in_hand=cash_in_hand,
             total_collected=total_collected,
+            total_inflow=total_inflow,
+            total_outflow=total_outflow,
             overdue_count=overdue_count,
             overdue_amount=overdue_amount
         )

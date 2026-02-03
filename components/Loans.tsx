@@ -3,6 +3,92 @@ import { useData } from '../context/DataContext';
 import { LoanType, Frequency, LoanStatus } from '../types';
 import { Plus, Search, Loader2, Pencil, Trash2, Download, X, ChevronUp, ChevronDown } from 'lucide-react';
 
+const NumericField = ({
+  label,
+  value,
+  onChange,
+  onIncrement,
+  onDecrement,
+  min = 0,
+  max,
+  prefix,
+  disabled = false,
+  step = 1
+}: {
+  label: string;
+  value: string;
+  onChange: (val: string) => void;
+  onIncrement: () => void;
+  onDecrement: () => void;
+  min?: number;
+  max?: number;
+  prefix?: string;
+  disabled?: boolean;
+  step?: number;
+}) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value;
+    // Allow only numbers and decimals
+    if (val !== '' && !/^\d*\.?\d*$/.test(val)) return;
+
+    // Remove leading zeros
+    if (val.length > 1 && val.startsWith('0') && !val.startsWith('0.')) {
+      val = val.replace(/^0+/, '');
+    }
+    onChange(val);
+  };
+
+  const handleIncrement = () => {
+    const current = Number(value) || 0;
+    if (max !== undefined && current + step > max) return;
+    onChange((current + step).toString());
+  };
+
+  const handleDecrement = () => {
+    const current = Number(value) || 0;
+    if (current - step < min) return;
+    onChange((current - step).toString());
+  };
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+      <div className="flex">
+        <button
+          type="button"
+          onClick={onDecrement || handleDecrement}
+          disabled={disabled || (Number(value) || 0) <= min}
+          className="px-3 py-2 border border-slate-200 bg-slate-50 text-slate-600 rounded-l-lg hover:bg-slate-100 disabled:opacity-50 transition-colors flex items-center justify-center"
+          title="Decrease"
+        >
+          <ChevronDown size={18} />
+        </button>
+        <div className="relative flex-1">
+          {prefix && value !== '' && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">{prefix}</span>}
+          <input
+            type="text"
+            className={`w-full border-y border-slate-200 p-2 focus:outline-none focus:ring-1 focus:ring-primary-500 text-center ${prefix && value !== '' ? 'pl-7' : ''}`}
+            value={value}
+            onChange={handleChange}
+            disabled={disabled}
+            required
+            placeholder="0"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={onIncrement || handleIncrement}
+          disabled={disabled || (max !== undefined && (Number(value) || 0) >= max)}
+          className="px-3 py-2 border border-slate-200 bg-slate-50 text-slate-600 rounded-r-lg hover:bg-slate-100 transition-colors flex items-center justify-center"
+          title="Increase"
+        >
+          <ChevronUp size={18} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const Loans: React.FC = () => {
   const { loans, addLoan, updateLoan, deleteLoan, addInstallments, addTransaction, isLoading, refreshData } = useData();
   const [showModal, setShowModal] = useState(false);
@@ -24,6 +110,11 @@ const Loans: React.FC = () => {
   // Daily Rate Specific
   const [dailyRate, setDailyRate] = useState<string>('100');
 
+  // New Fields
+  const [processRate, setProcessRate] = useState<string>('0');
+  const [payoutPercentage, setPayoutPercentage] = useState<string>('0');
+  const [isAdvancedInstallment, setIsAdvancedInstallment] = useState(false);
+
   // Get days based on frequency
   const getFrequencyDays = (freq: any): number => {
     if (!isNaN(Number(freq)) && freq !== '') return Number(freq);
@@ -40,92 +131,6 @@ const Loans: React.FC = () => {
     }
   };
 
-  const NumericField = ({
-    label,
-    value,
-    onChange,
-    onIncrement,
-    onDecrement,
-    min = 0,
-    max,
-    prefix,
-    disabled = false,
-    step = 1
-  }: {
-    label: string;
-    value: string;
-    onChange: (val: string) => void;
-    onIncrement: () => void;
-    onDecrement: () => void;
-    min?: number;
-    max?: number;
-    prefix?: string;
-    disabled?: boolean;
-    step?: number;
-  }) => {
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      let val = e.target.value;
-      // Allow only numbers and decimals
-      if (val !== '' && !/^\d*\.?\d*$/.test(val)) return;
-
-      // Remove leading zeros
-      if (val.length > 1 && val.startsWith('0') && !val.startsWith('0.')) {
-        val = val.replace(/^0+/, '');
-      }
-      onChange(val);
-    };
-
-    const handleIncrement = () => {
-      const current = Number(value) || 0;
-      if (max !== undefined && current + step > max) return;
-      onChange((current + step).toString());
-    };
-
-    const handleDecrement = () => {
-      const current = Number(value) || 0;
-      if (current - step < min) return;
-      onChange((current - step).toString());
-    };
-
-    return (
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
-        <div className="flex">
-          <button
-            type="button"
-            onClick={onDecrement || handleDecrement}
-            disabled={disabled || (Number(value) || 0) <= min}
-            className="px-3 py-2 border border-slate-200 bg-slate-50 text-slate-600 rounded-l-lg hover:bg-slate-100 disabled:opacity-50 transition-colors flex items-center justify-center"
-            title="Decrease"
-          >
-            <ChevronDown size={18} />
-          </button>
-          <div className="relative flex-1">
-            {prefix && value !== '' && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">{prefix}</span>}
-            <input
-              type="text"
-              className={`w-full border-y border-slate-200 p-2 focus:outline-none focus:ring-1 focus:ring-primary-500 text-center ${prefix && value !== '' ? 'pl-7' : ''}`}
-              value={value}
-              onChange={handleChange}
-              disabled={disabled}
-              required
-              placeholder="0"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={onIncrement || handleIncrement}
-            disabled={disabled || (max !== undefined && (Number(value) || 0) >= max)}
-            className="px-3 py-2 border border-slate-200 bg-slate-50 text-slate-600 rounded-r-lg hover:bg-slate-100 transition-colors flex items-center justify-center"
-            title="Increase"
-          >
-            <ChevronUp size={18} />
-          </button>
-        </div>
-      </div>
-    );
-  };
-
 
   const openEditModal = (loan: any) => {
     setEditingLoan(loan);
@@ -137,6 +142,13 @@ const Loans: React.FC = () => {
     setMultiplier(String(loan.total_rate_multiplier || loan.totalRateMultiplier || 1.2));
     setTenure(String(loan.tenure || 10));
     setDailyRate(String(loan.daily_rate_per_lakh || loan.dailyRatePerLakh || 100));
+    setProcessRate(String(loan.process_rate || '0'));
+    // If we have an absolute payout_rate in DB, but we now use percentage in UI, 
+    // we might want to back-calculate, but principal might have changed? 
+    // Actually when editing, these fields are disabled anyway per current logic.
+    const amt = Number(loan.payout_rate || 0);
+    const p = Number(loan.principal_amount || loan.principalAmount || 1);
+    setPayoutPercentage(amt > 0 ? ((amt / p) * 100).toFixed(2) : '0');
     setShowModal(true);
   };
 
@@ -147,7 +159,6 @@ const Loans: React.FC = () => {
 
     try {
       await deleteLoan(loanId);
-      // alert('Loan deleted successfully!'); // Removing alert for smoother UX, can be added back if preferred
       await refreshData();
     } catch (error: any) {
       alert(`Error deleting loan: ${error.message}`);
@@ -167,6 +178,8 @@ const Loans: React.FC = () => {
         status: 'ACTIVE',
         frequency: frequency,
         disbursement_date: startDate,
+        process_rate: Number(processRate) || 0,
+        payout_rate: (Number(principal) * (Number(payoutPercentage) || 0)) / 100
       };
 
       if (loanType === LoanType.TOTAL_RATE) {
@@ -179,13 +192,12 @@ const Loans: React.FC = () => {
       if (editingLoan) {
         // Update existing loan
         await updateLoan(editingLoan.id, loanData);
-        // alert('Loan updated successfully!');
       } else {
         // Create new loan
         const createdLoan = await addLoan(loanData);
         const loanId = createdLoan.id;
 
-        // Add Transaction for Disbursement - these are now sequential but fast
+        // Add Transaction for Disbursement
         await addTransaction({
           date: new Date().toISOString(),
           amount: Number(principal),
@@ -193,6 +205,18 @@ const Loans: React.FC = () => {
           category: 'Loan Disbursement',
           description: `Disbursed to ${clientName}`
         });
+
+        // Add Transaction for Payout/Commission if applicable
+        const calculatedPayout = (Number(principal) * (Number(payoutPercentage) || 0)) / 100;
+        if (calculatedPayout > 0) {
+          await addTransaction({
+            date: new Date().toISOString(),
+            amount: calculatedPayout,
+            type: 'DEBIT',
+            category: 'Payout',
+            description: `Commission Payout (${payoutPercentage}%) for ${clientName}'s loan`
+          });
+        }
 
         // Create installments
         const newInstallments: any[] = [];
@@ -207,34 +231,65 @@ const Loans: React.FC = () => {
             const dueDate = new Date(start);
             dueDate.setDate(start.getDate() + (i * days));
 
+            // Add process rate to the first installment only
+            const expectedAmt = i === 1 ? (installmentAmount + Number(processRate)) : installmentAmount;
+
+            const isFirstAndAdvanced = i === 1 && isAdvancedInstallment;
+
             newInstallments.push({
               loan_id: loanId,
               client_name: clientName,
               due_date: dueDate.toISOString().split('T')[0],
-              expected_amount: installmentAmount,
-              paid_amount: 0,
+              expected_amount: expectedAmt,
+              paid_amount: isFirstAndAdvanced ? expectedAmt : 0,
               penalty: 0,
-              status: 'PENDING',
+              status: isFirstAndAdvanced ? 'PAID' : 'PENDING',
+              paid_date: isFirstAndAdvanced ? new Date().toISOString().split('T')[0] : null,
               type: 'REGULAR'
             });
+
+            // If advanced, add a CREDIT transaction for it
+            if (isFirstAndAdvanced) {
+              await addTransaction({
+                date: new Date().toISOString(),
+                amount: expectedAmt,
+                type: 'CREDIT',
+                category: 'Loan Repayment',
+                description: `Advanced Installment payment from ${clientName}`
+              });
+            }
           }
         } else {
           // Daily Rate: Generate FIRST interest installment only
           const interestAmount = Math.ceil((Number(principal) / 100000) * Number(dailyRate) * days);
+          const expectedAmt = interestAmount + Number(processRate);
 
           const dueDate = new Date(start);
           dueDate.setDate(start.getDate() + days);
+
+          const isAdvanced = isAdvancedInstallment;
 
           newInstallments.push({
             loan_id: loanId,
             client_name: clientName,
             due_date: dueDate.toISOString().split('T')[0],
-            expected_amount: interestAmount,
-            paid_amount: 0,
+            expected_amount: expectedAmt,
+            paid_amount: isAdvanced ? expectedAmt : 0,
             penalty: 0,
-            status: 'PENDING',
+            status: isAdvanced ? 'PAID' : 'PENDING',
+            paid_date: isAdvanced ? new Date().toISOString().split('T')[0] : null,
             type: 'INTEREST_ONLY'
           });
+
+          if (isAdvanced) {
+            await addTransaction({
+              date: new Date().toISOString(),
+              amount: expectedAmt,
+              type: 'CREDIT',
+              category: 'Loan Repayment',
+              description: `Advanced Installment payment from ${clientName}`
+            });
+          }
         }
 
         if (newInstallments.length > 0) {
@@ -242,9 +297,7 @@ const Loans: React.FC = () => {
         }
       }
 
-      // Final single refresh to update everything (especially financial summary)
       await refreshData();
-
       setShowModal(false);
       resetForm();
     } catch (error: any) {
@@ -261,10 +314,12 @@ const Loans: React.FC = () => {
     setMultiplier('1.2');
     setTenure('10');
     setDailyRate('100');
+    setProcessRate('0');
+    setPayoutPercentage('0');
+    setIsAdvancedInstallment(false);
     setEditingLoan(null);
   };
 
-  // Export to Excel (CSV format)
   const exportToExcel = () => {
     const headers = ['ID', 'Client Name', 'Type', 'Principal', 'Frequency', 'Status', 'Start Date', 'Multiplier/Rate', 'Tenure'];
     const rows = loans.map(loan => {
@@ -499,6 +554,65 @@ const Loans: React.FC = () => {
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Process Rate (₹) - <span className="text-slate-400 font-normal italic">Optional</span></label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">₹</span>
+                    <input
+                      type="text"
+                      className="w-full border border-slate-200 p-2 pl-7 rounded-lg focus:ring-1 focus:ring-primary-500 outline-none"
+                      value={processRate}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val === '' || /^\d*\.?\d*$/.test(val)) setProcessRate(val);
+                      }}
+                      placeholder="0"
+                      disabled={!!editingLoan}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Commission (%) - <span className="text-slate-400 font-normal italic">Optional</span></label>
+                  <div className="relative">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">%</span>
+                    <input
+                      type="text"
+                      className="w-full border border-slate-200 p-2 pr-7 rounded-lg focus:ring-1 focus:ring-primary-500 outline-none"
+                      value={payoutPercentage}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val === '' || /^\d*\.?\d*$/.test(val)) setPayoutPercentage(val);
+                      }}
+                      placeholder="0"
+                      disabled={!!editingLoan}
+                    />
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-0.5 flex justify-between">
+                    <span>Est. Payout:</span>
+                    <span className="font-medium text-slate-600">₹{((Number(principal) * (Number(payoutPercentage) || 0)) / 100).toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              {!editingLoan && (
+                <div className="flex items-center gap-3 p-3 bg-primary-50 rounded-lg">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={isAdvancedInstallment}
+                      onChange={e => setIsAdvancedInstallment(e.target.checked)}
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                  </label>
+                  <div>
+                    <span className="block text-sm font-bold text-primary-900">Advanced Installment</span>
+                    <span className="block text-xs text-primary-700 text-pretty">First installment will be marked as paid immediately.</span>
+                  </div>
+                </div>
+              )}
+
               {loanType === LoanType.TOTAL_RATE ? (
                 <div className="p-4 bg-slate-50 rounded-lg space-y-3">
                   <h4 className="text-sm font-bold text-slate-600">Total Rate Config</h4>
@@ -524,9 +638,11 @@ const Loans: React.FC = () => {
                     />
                   </div>
                   <div className="text-xs text-slate-500 mt-2">
-                    Total Repayment: <span className="font-bold text-primary-600">₹{Math.ceil(Number(principal) * Number(multiplier)).toLocaleString()}</span>
+                    Total Repayment: <span className="font-bold text-primary-600">₹{(Math.ceil(Number(principal) * Number(multiplier)) + Number(processRate)).toLocaleString()}</span>
                     <br />
-                    Per Installment: <span className="font-bold text-primary-600">₹{Math.ceil((Number(principal) * Number(multiplier)) / (Number(tenure) || 1)).toLocaleString()}</span>
+                    1st Installment: <span className="font-bold text-primary-600">₹{(Math.ceil((Number(principal) * Number(multiplier)) / (Number(tenure) || 1)) + Number(processRate)).toLocaleString()}</span>
+                    <br />
+                    Other Installments: <span className="font-bold text-slate-600">₹{Math.ceil((Number(principal) * Number(multiplier)) / (Number(tenure) || 1)).toLocaleString()}</span>
                   </div>
                 </div>
               ) : (
@@ -543,8 +659,8 @@ const Loans: React.FC = () => {
                     step={10}
                   />
                   <div className="text-xs text-slate-500 mt-2">
-                    Est. Interest (per {days} days): <span className="font-bold text-primary-600">
-                      ₹{Math.ceil((Number(principal) / 100000) * Number(dailyRate) * days).toLocaleString()}
+                    1st Interest (per {days} days): <span className="font-bold text-primary-600">
+                      ₹{(Math.ceil((Number(principal) / 100000) * Number(dailyRate) * days) + Number(processRate)).toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -584,9 +700,9 @@ const Loans: React.FC = () => {
               </div>
             </form>
           </div>
-        </div >
+        </div>
       )}
-    </div >
+    </div>
   );
 };
 

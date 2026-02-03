@@ -85,6 +85,8 @@ class LoanBase(BaseModel):
     total_rate_multiplier: Optional[float] = None
     tenure: Optional[int] = None
     daily_rate_per_lakh: Optional[float] = None
+    process_rate: Optional[float] = 0
+    payout_rate: Optional[float] = 0
     status: LoanStatus = LoanStatus.ACTIVE
 
 
@@ -174,5 +176,7 @@ class FinancialSummary(BaseModel):
     total_interest_expected: float
     cash_in_hand: float
     total_collected: float
+    total_inflow: float
+    total_outflow: float
     overdue_count: int
     overdue_amount: float

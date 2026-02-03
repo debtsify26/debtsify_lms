@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS public.loans (
     
     -- Daily Rate specific fields
     daily_rate_per_lakh DECIMAL(10, 2),
+    process_rate DECIMAL(15, 2) DEFAULT 0,
+    payout_rate DECIMAL(15, 2) DEFAULT 0,
     last_interest_generation_date DATE,
     
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
