@@ -382,6 +382,21 @@ const Loans: React.FC = () => {
             <Download size={18} /> Export
           </button>
           <button
+            onClick={async () => {
+              try {
+                const { installmentsAPI } = await import('../services/api');
+                await installmentsAPI.syncLoanStatuses();
+                await refreshData();
+                alert('Loan statuses synced successfully!');
+              } catch (err: any) {
+                alert(`Sync failed: ${err.message}`);
+              }
+            }}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors shadow-sm"
+          >
+            <Download size={18} /> Sync Statuses
+          </button>
+          <button
             onClick={() => { resetForm(); setShowModal(true); }}
             className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors shadow-sm"
           >

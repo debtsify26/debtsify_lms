@@ -22,6 +22,7 @@ class Frequency(str, Enum):
 
 class LoanStatus(str, Enum):
     ACTIVE = "ACTIVE"
+    COMPLETED = "COMPLETED"
     CLOSED = "CLOSED"
     BAD_DEBT = "BAD_DEBT"
 
@@ -72,6 +73,7 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPassword(BaseModel):
     new_password: str = Field(..., min_length=6)
     access_token: str
+    refresh_token: str
 
 
 # Loan Schemas

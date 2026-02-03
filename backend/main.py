@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from config import settings
-from routers import auth_router, loans_router, installments_router, transactions_router, sync_router
+from routers import auth_router, loans_router, installments_router, transactions_router, sync_router, investment_breakdown_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -28,6 +28,7 @@ app.include_router(loans_router.router)
 app.include_router(installments_router.router)
 app.include_router(transactions_router.router)
 app.include_router(sync_router.router)
+app.include_router(investment_breakdown_router.router)
 
 
 @app.get("/")

@@ -168,7 +168,7 @@ async def reset_password(
         # if we need to bypass or the regular client if the token is passed.
         
         # Validating/Setting session with provided token
-        db.auth.set_session(request.access_token, "") 
+        db.auth.set_session(request.access_token, request.refresh_token) 
         
         auth_response = db.auth.update_user({
             "password": request.new_password

@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS public.loans (
     start_date DATE NOT NULL,
     frequency TEXT NOT NULL,
     disbursement_date DATE NOT NULL,
-    status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'CLOSED', 'BAD_DEBT')),
+    status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'COMPLETED', 'CLOSED', 'BAD_DEBT')),
     
     -- Total Rate specific fields
     total_rate_multiplier DECIMAL(5, 2),
@@ -38,6 +38,25 @@ CREATE TABLE IF NOT EXISTS public.loans (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Investment Breakdown table (Main Analytics Table)
+CREATE TABLE IF NOT EXISTS public.investment_breakdown (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    loan_id UUID NOT NULL REFERENCES public.loans(id) ON DELETE CASCADE,
+    person TEXT NOT NULL,
+    start_date DATE NOT NULL,
+    cycle TEXT NOT NULL,
+    capital DECIMAL(15, 2) NOT NULL,
+    interest_percentage DECIMAL(5, 2) NOT NULL,
+    received DECIMAL(15, 2) DEFAULT 0,
+    mkt_principal DECIMAL(15, 2) DEFAULT 0,
+    mkt_interest DECIMAL(15, 2) DEFAULT 0,
+    total_market_value DECIMAL(15, 2) DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 
 -- Installments table
 CREATE TABLE IF NOT EXISTS public.installments (

@@ -9,6 +9,7 @@ const ResetPassword: React.FC = () => {
     const [localError, setLocalError] = useState('');
     const [isSuccess, setIsSuccess] = useState(false);
     const [accessToken, setAccessToken] = useState<string | null>(null);
+    const [refreshToken, setRefreshToken] = useState<string | null>(null);
 
     useEffect(() => {
         // Supabase recovery links put parameters in the URL fragment (after #)
@@ -16,8 +17,10 @@ const ResetPassword: React.FC = () => {
         if (hash) {
             const params = new URLSearchParams(hash.substring(1));
             const token = params.get('access_token');
-            if (token) {
+            const refresh = params.get('refresh_token');
+            if (token && refresh) {
                 setAccessToken(token);
+                setRefreshToken(refresh);
             }
         }
     }, []);
@@ -36,13 +39,13 @@ const ResetPassword: React.FC = () => {
             return;
         }
 
-        if (!accessToken) {
+        if (!accessToken || !refreshToken) {
             setLocalError('Invalid or expired reset link. Please request a new one.');
             return;
         }
 
         try {
-            await resetPassword(password, accessToken);
+            await resetPassword(password, accessToken, refreshToken);
             setIsSuccess(true);
         } catch (err: any) {
             setLocalError(err.message || 'Failed to update password');
@@ -85,7 +88,7 @@ const ResetPassword: React.FC = () => {
                         </div>
                     )}
 
-                    {!accessToken ? (
+                    {!accessToken || !refreshToken ? (
                         <div className="text-center p-4">
                             <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
                             <p className="text-neutral-800 font-medium mb-4">Invalid Reset Link</p>

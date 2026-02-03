@@ -28,7 +28,13 @@ const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
 
     const response = await fetch(`${API_BASE_URL}${url}`, {
         ...options,
-        headers,
+        cache: 'no-store', // Prevent caching
+        headers: {
+            ...headers,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        },
     });
 
     if (response.status === 401) {
@@ -109,11 +115,15 @@ export const authAPI = {
         return response.json();
     },
 
-    resetPassword: async (newPassword: string, accessToken: string) => {
+    resetPassword: async (newPassword: string, accessToken: string, refreshToken: string) => {
         const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ new_password: newPassword, access_token: accessToken }),
+            body: JSON.stringify({
+                new_password: newPassword,
+                access_token: accessToken,
+                refresh_token: refreshToken
+            }),
         });
 
         if (!response.ok) {
@@ -263,6 +273,18 @@ export const installmentsAPI = {
             throw new Error('Failed to delete installment');
         }
     },
+
+    syncLoanStatuses: async () => {
+        const response = await fetchWithAuth('/installments/sync-loan-statuses', {
+            method: 'POST',
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to sync loan statuses');
+        }
+
+        return response.json();
+    },
 };
 
 // Transactions API
@@ -331,8 +353,9 @@ export const healthCheck = async () => {
 
 // Sync API
 export const syncAPI = {
-    syncData: async () => {
-        const response = await fetchWithAuth('/sync', {
+    syncData: async (createArchive: boolean = false) => {
+        const url = createArchive ? '/sync?create_archive=true' : '/sync';
+        const response = await fetchWithAuth(url, {
             method: 'POST',
         });
 

@@ -170,6 +170,27 @@ async def update_installment(
             )
         
         logging.info(f"Successfully updated installment {installment_id}")
+        
+        # Check if all installments for this loan are now paid
+        updated_installment = response.data[0]
+        loan_id = updated_installment.get("loan_id")
+        
+        if loan_id:
+            # Get all installments for this loan
+            all_installments = db.table("installments").select("*").eq("loan_id", loan_id).execute()
+            
+            if all_installments.data:
+                # Check if all are paid
+                all_paid = all(inst.get("status") == "PAID" for inst in all_installments.data)
+                
+                if all_paid:
+                    # Update loan status to COMPLETED
+                    db.table("loans").update({"status": "COMPLETED"}).eq("id", loan_id).execute()
+                    logging.info(f"Loan {loan_id} marked as COMPLETED - all installments paid")
+                else:
+                    # Ensure loan is ACTIVE if not all paid (in case it was completed before)
+                    db.table("loans").update({"status": "ACTIVE"}).eq("id", loan_id).execute()
+        
         return InstallmentResponse(**response.data[0])
     
     except HTTPException:
@@ -209,4 +230,54 @@ async def delete_installment(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete installment: {str(e)}"
+        )
+
+
+@router.post("/sync-loan-statuses", status_code=status.HTTP_200_OK)
+async def sync_all_loan_statuses(
+    user_id: str = Depends(get_current_user_id),
+    db: Client = Depends(get_supabase_admin)
+):
+    """Check all loans and update their status based on installment completion"""
+    try:
+        import logging
+        
+        # Get all loans for this user
+        loans_response = db.table("loans").select("*").eq("user_id", user_id).execute()
+        
+        updated_count = 0
+        
+        for loan in loans_response.data:
+            loan_id = loan.get("id")
+            current_status = loan.get("status")
+            
+            # Get all installments for this loan
+            installments = db.table("installments").select("*").eq("loan_id", loan_id).execute()
+            
+            if installments.data:
+                # Check if all are paid
+                all_paid = all(inst.get("status") == "PAID" for inst in installments.data)
+                
+                if all_paid and current_status != "COMPLETED":
+                    # Update to COMPLETED
+                    db.table("loans").update({"status": "COMPLETED"}).eq("id", loan_id).execute()
+                    logging.info(f"Loan {loan_id} updated to COMPLETED")
+                    updated_count += 1
+                elif not all_paid and current_status == "COMPLETED":
+                    # Revert to ACTIVE
+                    db.table("loans").update({"status": "ACTIVE"}).eq("id", loan_id).execute()
+                    logging.info(f"Loan {loan_id} reverted to ACTIVE")
+                    updated_count += 1
+        
+        return {
+            "message": f"Successfully synced {updated_count} loan statuses",
+            "updated_count": updated_count
+        }
+    
+    except Exception as e:
+        import logging
+        logging.error(f"Error syncing loan statuses: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to sync loan statuses: {str(e)}"
         )

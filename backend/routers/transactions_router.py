@@ -146,8 +146,8 @@ async def get_financial_summary(
         
         # Calculate metrics
         total_loans = len(loans)
-        active_loans = len([l for l in loans if l["status"] == "ACTIVE"])
-        total_disbursed = sum(float(l["principal_amount"]) for l in loans)
+        active_loans = len([l for l in loans if l.get("status") == "ACTIVE"])
+        total_disbursed = sum(float(l.get("principal_amount", 0)) for l in loans)
         
         # Market amount calculation
         market_amount = 0.0
@@ -156,62 +156,63 @@ async def get_financial_summary(
         total_interest_expected = 0.0
         
         for loan in loans:
-            l_principal = float(loan["principal_amount"])
-            if loan["type"] == "TOTAL_RATE":
+            l_principal = float(loan.get("principal_amount", 0))
+            loan_type = loan.get("type", "")
+            loan_status = loan.get("status", "ACTIVE")
+            
+            if loan_type == "TOTAL_RATE":
                 multiplier = float(loan.get("total_rate_multiplier", 1.2))
                 total_repay = l_principal * multiplier
                 l_interest = total_repay - l_principal
                 total_interest_expected += l_interest
                 
-                # Get installments for this loan
-                loan_insts = [i for i in installments if i["loan_id"] == loan["id"]]
-                for inst in loan_insts:
-                    if inst["status"] != "PAID":
-                        # Amortized Principal vs Interest
-                        remaining = float(inst["expected_amount"]) - float(inst["paid_amount"])
-                        market_amount += remaining
-                        market_principal += remaining * (l_principal / total_repay)
-                        market_interest += remaining * (l_interest / total_repay)
+                if loan_status != "COMPLETED":
+                    # Get installments for this loan
+                    loan_insts = [i for i in installments if i.get("loan_id") == loan.get("id")]
+                    for inst in loan_insts:
+                        if inst.get("status") != "PAID":
+                            # Amortized Principal vs Interest
+                            remaining = float(inst.get("expected_amount", 0)) - float(inst.get("paid_amount", 0))
+                            market_amount += remaining
+                            market_principal += remaining * (l_principal / total_repay)
+                            market_interest += remaining * (l_interest / total_repay)
             else:
                 # DAILY_RATE
-                # Total interest expected for Daily Rate is harder to predict as it's recurring, 
-                # but we can sum generated interest
-                loan_insts = [i for i in installments if i["loan_id"] == loan["id"]]
-                total_interest_expected += sum(float(i["expected_amount"]) for i in loan_insts if i["type"] == "INTEREST_ONLY")
+                loan_insts = [i for i in installments if i.get("loan_id") == loan.get("id")]
+                total_interest_expected += sum(float(i.get("expected_amount", 0)) for i in loan_insts if i.get("type") == "INTEREST_ONLY")
                 
-                if loan["status"] == "ACTIVE":
+                if loan_status == "ACTIVE":
                     market_amount += l_principal
                     market_principal += l_principal
                 
                 for inst in loan_insts:
-                    if inst["status"] != "PAID":
-                        remaining = float(inst["expected_amount"]) - float(inst["paid_amount"])
+                    if inst.get("status") != "PAID":
+                        remaining = float(inst.get("expected_amount", 0)) - float(inst.get("paid_amount", 0))
                         market_amount += remaining
                         market_interest += remaining
 
-        # Cash in hand from transactions
-        cash_in_hand = 0.0
-        for txn in transactions:
-            if txn["type"] == "CREDIT":
-                cash_in_hand += float(txn["amount"])
-            else:
-                cash_in_hand -= float(txn["amount"])
+        # Cash Flow Calculations
+        # 1. Total Inflow = All Installments Paid + All Credit Transactions
+        total_installments_collected = sum(float(inst.get("paid_amount", 0)) for inst in installments)
+        total_txn_credit = sum(float(txn.get("amount", 0)) for txn in transactions if txn.get("type") == "CREDIT")
         
-        # Total collected (sum of paid installments) -> This is our INFLOW
-        total_inflow = sum(float(inst["paid_amount"]) for inst in installments)
-        total_collected = total_inflow
+        total_inflow = total_installments_collected + total_txn_credit
+        total_collected = total_installments_collected # Keeping collected as just installments for clarity
         
-        # Outflow Logic: Actual Money Spent (Disbursed Principal + Payouts + Expenses)
-        total_payouts = sum(float(txn["amount"]) for txn in transactions if txn["category"] == "Payout")
-        total_expenses = sum(float(txn["amount"]) for txn in transactions if txn["category"] in ["Personal Expense", "Business Expense", "Expense"])
+        # 2. Total Outflow = All Loan Disbursements + All Debit Transactions
+        # Note: We assume disbursements are NOT recorded as separate Debit transactions.
+        total_txn_debit = sum(float(txn.get("amount", 0)) for txn in transactions if txn.get("type") == "DEBIT")
         
-        total_outflow = total_disbursed + total_payouts + total_expenses
+        total_outflow = total_disbursed + total_txn_debit
 
+        # 3. Cash in Hand
+        cash_in_hand = total_inflow - total_outflow
+        
         # Overdue metrics
-        overdue_installments = [inst for inst in installments if inst["status"] == "OVERDUE"]
+        overdue_installments = [inst for inst in installments if inst.get("status") == "OVERDUE"]
         overdue_count = len(overdue_installments)
         overdue_amount = sum(
-            float(inst["expected_amount"]) - float(inst["paid_amount"])
+            float(inst.get("expected_amount", 0)) - float(inst.get("paid_amount", 0))
             for inst in overdue_installments
         )
         
