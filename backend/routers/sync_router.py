@@ -175,9 +175,12 @@ def sync_to_sheet(spreadsheet, sheet_name: str, data: list):
     try:
         try:
             worksheet = spreadsheet.worksheet(sheet_name)
+            # Resize to ensure enough space (min 1000 or data length + 100)
+            required_rows = max(1000, len(data) + 100)
+            worksheet.resize(rows=required_rows)
         except gspread.exceptions.WorksheetNotFound:
             # Create sheet with blue header if new
-            worksheet = spreadsheet.add_worksheet(title=sheet_name, rows="100", cols="20")
+            worksheet = spreadsheet.add_worksheet(title=sheet_name, rows="5000", cols="20")
         
         worksheet.clear()
         

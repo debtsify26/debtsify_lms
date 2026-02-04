@@ -43,7 +43,16 @@ const Ledger: React.FC = () => {
     });
 
     // Ensure newest first!
-    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return filtered.sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      if (dateA !== dateB) return dateB - dateA;
+
+      // Secondary sort by created_at
+      const createdA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const createdB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return createdB - createdA;
+    });
   }, [transactions, searchTerm, filterType, filterCategory, filterStartDate, filterEndDate]);
 
   // Group by Week (using filtered transactions)

@@ -206,7 +206,8 @@ const Loans: React.FC = () => {
           amount: principalAmt,
           type: 'DEBIT',
           category: 'Loan Disbursement',
-          description: `Disbursed to ${clientName}`
+          description: `Disbursed to ${clientName}`,
+          related_entity_id: loanId
         });
 
         if (payoutAmt > 0) {
@@ -215,7 +216,8 @@ const Loans: React.FC = () => {
             amount: payoutAmt,
             type: 'DEBIT',
             category: 'Payout',
-            description: `${clientName} (${principalAmt}) ${startDate} - payout fees (${payoutPercentage}%)`
+            description: `${clientName} (${principalAmt}) ${startDate} - payout fees (${payoutPercentage}%)`,
+            related_entity_id: loanId
           });
         }
 
@@ -225,7 +227,8 @@ const Loans: React.FC = () => {
             amount: processAmt,
             type: 'CREDIT',
             category: 'Processing Fee',
-            description: `${clientName} (${principalAmt}) - ${startDate} - processing fees (${processFeePercent}%)`
+            description: `${clientName} (${principalAmt}) - ${startDate} - processing fees (${processFeePercent}%)`,
+            related_entity_id: loanId
           });
         }
 
@@ -264,7 +267,8 @@ const Loans: React.FC = () => {
                 amount: expectedAmt,
                 type: 'CREDIT',
                 category: 'Loan Repayment',
-                description: `Advanced Installment (Last) payment from ${clientName}`
+                description: `Advanced Installment (Last) payment from ${clientName}`,
+                related_entity_id: loanId
               });
             }
           }
@@ -296,7 +300,8 @@ const Loans: React.FC = () => {
               amount: expectedAmt,
               type: 'CREDIT',
               category: 'Loan Repayment',
-              description: `Advanced Installment payment from ${clientName}`
+              description: `Advanced Installment payment from ${clientName}`,
+              related_entity_id: loanId
             });
           }
         }

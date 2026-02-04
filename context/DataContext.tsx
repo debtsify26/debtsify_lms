@@ -16,6 +16,7 @@ interface DataContextType {
   updateInstallment: (id: string, updates: Partial<Installment>) => Promise<void>;
   deleteInstallment: (id: string) => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, 'id' | 'created_at'>) => Promise<void>;
+  addTransactions: (transactions: Omit<Transaction, 'id' | 'created_at'>[]) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
   financialSummary: any | null;
   refreshData: () => Promise<void>;
@@ -108,6 +109,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setLoans((prev) => prev.filter((l) => l.id !== id));
       // Also remove related installments
       setInstallments((prev) => prev.filter((i) => i.loan_id !== id));
+      // Also remove related transactions (Disbursements, Payouts, etc.)
+      setTransactions((prev) => prev.filter((t) => t.related_entity_id !== id));
     } catch (err: any) {
       setError(err.message || 'Failed to delete loan');
       throw err;
@@ -156,6 +159,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setTransactions((prev) => [newTransaction, ...prev]); // Newest first
     } catch (err: any) {
       setError(err.message || 'Failed to create transaction');
+      throw err;
+    }
+  };
+
+  const addTransactions = async (transactionsData: Omit<Transaction, 'id' | 'created_at'>[]) => {
+    setError(null);
+    try {
+      const newTransactions = await transactionsAPI.bulkCreate(transactionsData);
+      setTransactions((prev) => [...newTransactions, ...prev]); // Add all new ones
+    } catch (err: any) {
+      setError(err.message || 'Failed to create transactions');
       throw err;
     }
   };
@@ -222,6 +236,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     updateInstallment,
     deleteInstallment,
     addTransaction,
+    addTransactions,
     deleteTransaction,
     refreshData,
     localSummary,

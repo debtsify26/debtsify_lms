@@ -18,7 +18,7 @@ const KPICard = ({ title, amount, icon: Icon, color }: any) => (
 );
 
 const Dashboard: React.FC = () => {
-  const { localSummary, installments, transactions, addTransaction, refreshData, isLoading } = useData();
+  const { localSummary, installments, transactions, addTransaction, addTransactions, refreshData, isLoading } = useData();
   const summary = localSummary();
   const [showTransModal, setShowTransModal] = React.useState(false);
   const [transType, setTransType] = React.useState<'CREDIT' | 'DEBIT'>('DEBIT');
@@ -45,7 +45,8 @@ const Dashboard: React.FC = () => {
   const handleAddTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    const dates: Date[] = [];
+    const transactionsData: any[] = [];
+
     try {
       if (isDateRange && transEndDate) {
         const start = new Date(transDate);
@@ -53,30 +54,52 @@ const Dashboard: React.FC = () => {
 
         // Loop from start to end (inclusive)
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-          dates.push(new Date(d));
-        }
+          // Construct date object
+          let finalDate = new Date(d);
+          const todayStr = new Date().toISOString().split('T')[0];
+          const dStr = d.toISOString().split('T')[0];
 
-        if (dates.length === 0 && start.getTime() <= end.getTime()) {
-          // Fallback if loop didn't run (e.g. same day)
-          dates.push(start);
-        } else if (dates.length === 0) {
-          throw new Error("End date must be after Start date");
-        }
+          // If the date is 'today', use current time to ensure it looks 'latest'
+          if (dStr === todayStr) {
+            const now = new Date();
+            finalDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+          }
 
-        // Create a transaction for each date
-        await Promise.all(dates.map(date =>
-          addTransaction({
-            date: date.toISOString(),
+          transactionsData.push({
+            date: finalDate.toISOString(),
             amount: Number(transAmount),
             type: transType,
             category: transCategory,
             description: transDescription
-          })
-        ));
+          });
+        }
+
+        if (transactionsData.length === 0 && start.getTime() <= end.getTime()) {
+          // Fallback for same day range
+          transactionsData.push({
+            date: new Date(transDate).toISOString(),
+            amount: Number(transAmount),
+            type: transType,
+            category: transCategory,
+            description: transDescription
+          });
+        } else if (transactionsData.length === 0) {
+          throw new Error("End date must be after Start date");
+        }
+
+        // Single bulk call
+        await addTransactions(transactionsData);
+
       } else {
         // Single transaction
+        let finalDate = new Date(transDate);
+        const todayStr = new Date().toISOString().split('T')[0];
+        if (transDate === todayStr) {
+          finalDate = new Date(); // Use current date & time
+        }
+
         await addTransaction({
-          date: new Date(transDate).toISOString(),
+          date: finalDate.toISOString(),
           amount: Number(transAmount),
           type: transType,
           category: transCategory,
@@ -90,7 +113,7 @@ const Dashboard: React.FC = () => {
       setTransDescription('');
 
       if (isDateRange) {
-        alert(`Successfully added ${dates.length} transactions.`);
+        alert(`Successfully added ${transactionsData.length} transactions.`);
       } else {
         alert('Transaction added successfully.');
       }

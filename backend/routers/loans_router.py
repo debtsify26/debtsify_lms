@@ -146,6 +146,10 @@ async def delete_loan(
             )
         
         # Delete loan
+        # First delete related transactions (manual cascade if not handled by DB)
+        db.table("transactions").delete().eq("related_entity_id", loan_id).execute()
+        
+        # Then delete loan (installments cascade automatically via FK)
         db.table("loans").delete().eq("id", loan_id).execute()
         
         return None

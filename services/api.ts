@@ -324,6 +324,20 @@ export const transactionsAPI = {
         return response.json();
     },
 
+    bulkCreate: async (transactionsData: any[]) => {
+        const response = await fetchWithAuth('/transactions/bulk', {
+            method: 'POST',
+            body: JSON.stringify(transactionsData),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to bulk create transactions');
+        }
+
+        return response.json();
+    },
+
     delete: async (id: string) => {
         const response = await fetchWithAuth(`/transactions/${id}`, {
             method: 'DELETE',

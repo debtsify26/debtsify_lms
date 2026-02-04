@@ -8,6 +8,48 @@ from auth import get_current_user_id
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
 
+@router.post("/bulk", response_model=List[TransactionResponse], status_code=status.HTTP_201_CREATED)
+async def create_bulk_transactions(
+    transactions: List[TransactionCreate],
+    user_id: str = Depends(get_current_user_id),
+    db: Client = Depends(get_supabase_admin)
+):
+    """Create multiple transactions at once"""
+    try:
+        from datetime import datetime
+        
+        if not transactions:
+            return []
+            
+        transactions_data = []
+        utc_now = datetime.utcnow().isoformat()
+        
+        for txn in transactions:
+            txn_dict = txn.model_dump()
+            txn_dict["user_id"] = user_id
+            if not txn_dict.get("date"):
+                txn_dict["date"] = utc_now
+            transactions_data.append(txn_dict)
+        
+        response = db.table("transactions").insert(transactions_data).execute()
+        
+        if not response.data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to bulk create transactions"
+            )
+        
+        return [TransactionResponse(**txn) for txn in response.data]
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to bulk create transactions: {str(e)}"
+        )
+
+
 @router.post("", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
 async def create_transaction(
     transaction: TransactionCreate,

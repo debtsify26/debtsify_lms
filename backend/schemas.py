@@ -162,6 +162,7 @@ class TransactionResponse(TransactionBase):
     id: str
     user_id: str
     date: datetime
+    created_at: datetime
 
     class Config:
         from_attributes = True
