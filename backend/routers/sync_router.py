@@ -69,25 +69,85 @@ def perform_sync(user_id: str, db: Client, create_monthly_archive: bool = False)
         sync_to_sheet(spreadsheet, "Installments", installments_response.data)
         sync_to_sheet(spreadsheet, "Transactions", transactions_response.data)
         
-        # 4. Sync Investment Breakdown from database table
-        breakdown_response = db.table("investment_breakdown").select("*").eq("user_id", user_id).execute()
+        # 4. Sync Investment Breakdown
+        # Calculate breakdown locally
+        breakdown_data = create_investment_breakdown(loans_response.data, installments_response.data)
         
-        # Format for sheets
-        breakdown_formatted = []
-        for item in breakdown_response.data:
-            breakdown_formatted.append({
-                "Person": item.get("person"),
-                "Start Date": item.get("start_date"),
-                "Cycle": item.get("cycle"),
-                "Capital": f"₹{float(item.get('capital', 0)):,.0f}",
-                "Int (%)": f"{float(item.get('interest_percentage', 0)):.1f}%",
-                "Received": f"₹{float(item.get('received', 0)):,.0f}",
-                "Mkt Principal": f"₹{float(item.get('mkt_principal', 0)):,.0f}",
-                "Mkt Interest": f"₹{float(item.get('mkt_interest', 0)):,.0f}",
-                "Total Market Value": f"₹{float(item.get('total_market_value', 0)):,.0f}"
-            })
-        
-        sync_to_sheet(spreadsheet, "Investment_Breakdown", breakdown_formatted)
+        # Save calculated breakdown to Database
+        try:
+           # First delete existing for this user (full refresh)
+           db.table("investment_breakdown").delete().eq("user_id", user_id).execute()
+           
+           # Prepare data for insertion (unformatted numbers)
+           db_insert_data = []
+           for item in breakdown_data:
+               # Parse formatted strings back to numbers/raw values
+               # Note: create_investment_breakdown returns formatted strings (e.g. ₹20,000)
+               # We need to extract raw values. Ideally, refactor helper to return raw data.
+               # For now, we will just parse it back or use a new helper.
+               
+               # Actually, let's just make create_investment_breakdown return raw data + formatted
+               # But to avoid breaking changes, let's just recalculate for DB insertion here quickly.
+               # Or better: Extract the calculation logic. See below.
+               pass
+
+           # Redoing calculation for DB insertion clean up
+           db_records = []
+           for loan in loans_response.data:
+                l_id = loan.get("id")
+                principal = float(loan.get("principal_amount", 0))
+                multiplier = float(loan.get("total_rate_multiplier") or 1.2)
+                l_type = loan.get("type")
+                
+                # Fetch installments for this loan
+                l_insts = [i for i in installments_response.data if i.get("loan_id") == l_id]
+                received = sum(float(i.get("paid_amount", 0)) for i in l_insts)
+                
+                # Market Value Logic
+                mkt_principal = 0.0
+                mkt_interest = 0.0
+                
+                if l_type == "TOTAL_RATE":
+                    total_repay = principal * multiplier
+                    total_interest = total_repay - principal
+                    for i in l_insts:
+                        if i.get("status") != "PAID":
+                            rem = float(i.get("expected_amount", 0)) - float(i.get("paid_amount", 0))
+                            mkt_principal += rem * (principal / total_repay)
+                            mkt_interest += rem * (total_interest / total_repay)
+                    int_pct = (multiplier - 1) * 100
+                else: 
+                    # DAILY_RATE
+                    daily_rate = float(loan.get("daily_rate_per_lakh", 0))
+                    int_pct = daily_rate
+                    if loan.get("status") == "ACTIVE":
+                         mkt_principal = principal
+                    for i in l_insts:
+                        if i.get("status") != "PAID":
+                             mkt_interest += (float(i.get("expected_amount", 0)) - float(i.get("paid_amount", 0)))
+
+                db_records.append({
+                    "user_id": user_id,
+                    "loan_id": l_id,
+                    "person": loan.get("client_name"),
+                    "start_date": loan.get("start_date"),
+                    "cycle": loan.get("frequency"),
+                    "capital": principal,
+                    "interest_percentage": int_pct,
+                    "received": received,
+                    "mkt_principal": mkt_principal,
+                    "mkt_interest": mkt_interest,
+                    "total_market_value": mkt_principal + mkt_interest
+                })
+           
+           if db_records:
+               db.table("investment_breakdown").insert(db_records).execute()
+               
+        except Exception as db_err:
+            print(f"Warning: Failed to update investment_breakdown table: {str(db_err)}")
+
+        # Sync to Sheets (using formatted helper)
+        sync_to_sheet(spreadsheet, "Investment_Breakdown", breakdown_data)
         
         # 2. Create monthly archive if requested or if it's a new month
         current_month = datetime.now().strftime("%Y-%m")
