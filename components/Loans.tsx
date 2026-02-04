@@ -215,7 +215,17 @@ const Loans: React.FC = () => {
             amount: payoutAmt,
             type: 'DEBIT',
             category: 'Payout',
-            description: `Commission Payout (${payoutPercentage}%) for ${clientName}'s loan`
+            description: `${clientName} (${principalAmt}) ${startDate} - payout fees (${payoutPercentage}%)`
+          });
+        }
+
+        if (processAmt > 0) {
+          await addTransaction({
+            date: new Date().toISOString(),
+            amount: processAmt,
+            type: 'CREDIT',
+            category: 'Processing Fee',
+            description: `${clientName} (${principalAmt}) - ${startDate} - processing fees (${processFeePercent}%)`
           });
         }
 
@@ -232,36 +242,36 @@ const Loans: React.FC = () => {
             const dueDate = new Date(start);
             dueDate.setDate(start.getDate() + (i * days));
 
-            // Add process rate to the first installment
-            const expectedAmt = i === 1 ? (installmentAmount + processAmt) : installmentAmount;
-            const isFirstAndAdvanced = i === 1 && isAdvancedInstallment;
+            // Process rate is now separate, so no addition to first installment
+            const expectedAmt = installmentAmount;
+            const isLastAndAdvanced = isAdvancedInstallment && (i === numInstallments);
 
             newInstallments.push({
               loan_id: loanId,
               client_name: clientName,
               due_date: dueDate.toISOString().split('T')[0],
               expected_amount: expectedAmt,
-              paid_amount: isFirstAndAdvanced ? expectedAmt : 0,
+              paid_amount: isLastAndAdvanced ? expectedAmt : 0,
               penalty: 0,
-              status: isFirstAndAdvanced ? 'PAID' : 'PENDING',
-              paid_date: isFirstAndAdvanced ? new Date().toISOString().split('T')[0] : null,
+              status: isLastAndAdvanced ? 'PAID' : 'PENDING',
+              paid_date: isLastAndAdvanced ? new Date().toISOString().split('T')[0] : null,
               type: 'REGULAR'
             });
 
-            if (isFirstAndAdvanced) {
+            if (isLastAndAdvanced) {
               await addTransaction({
                 date: new Date().toISOString(),
                 amount: expectedAmt,
                 type: 'CREDIT',
                 category: 'Loan Repayment',
-                description: `Advanced Installment payment from ${clientName}`
+                description: `Advanced Installment (Last) payment from ${clientName}`
               });
             }
           }
         } else {
           // Daily Rate
           const interestAmount = Math.ceil((principalAmt / 100000) * Number(dailyRate) * days);
-          const expectedAmt = interestAmount + processAmt;
+          const expectedAmt = interestAmount;
 
           const dueDate = new Date(start);
           dueDate.setDate(start.getDate() + days);
@@ -525,7 +535,7 @@ const Loans: React.FC = () => {
                   </label>
                   <div>
                     <span className="block text-sm font-bold text-primary-900">Advanced Installment</span>
-                    <span className="block text-xs text-primary-700 text-pretty">First installment paid immediately.</span>
+                    <span className="block text-xs text-primary-700 text-pretty">Last installment paid immediately.</span>
                   </div>
                 </div>
               )}
@@ -542,11 +552,11 @@ const Loans: React.FC = () => {
                 <div className="p-4 bg-slate-50 rounded-lg text-xs text-slate-600 space-y-1">
                   <div className="flex justify-between">
                     <span>Total Repayment:</span>
-                    <span className="font-bold text-primary-600">₹{(Math.ceil(Number(principal) * Number(multiplier)) + ((Number(principal) * (Number(processFeePercent) || 0)) / 100)).toLocaleString()}</span>
+                    <span className="font-bold text-primary-600">₹{(Math.ceil(Number(principal) * Number(multiplier))).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>1st Installment:</span>
-                    <span className="font-bold">₹{(Math.ceil((Number(principal) * Number(multiplier)) / (numInstallments || 1)) + ((Number(principal) * (Number(processFeePercent) || 0)) / 100)).toLocaleString()}</span>
+                    <span className="font-bold">₹{Math.ceil((Number(principal) * Number(multiplier)) / (numInstallments || 1)).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Regular Installment:</span>
