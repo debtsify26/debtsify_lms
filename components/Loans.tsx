@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useData } from '../context/DataContext';
 import { LoanType, Frequency } from '../types';
-import { Plus, Search, Loader2, Pencil, Trash2, Download, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Search, Loader2, Pencil, Trash2, Download, X, ChevronUp, ChevronDown, Eye, TrendingUp, Clock, CheckCircle2, AlertTriangle, IndianRupee, BarChart3 } from 'lucide-react';
 
 const SimpleInput = ({
   label,
@@ -68,11 +68,12 @@ const SimpleInput = ({
 };
 
 const Loans: React.FC = () => {
-  const { loans, addLoan, updateLoan, deleteLoan, addInstallments, addTransaction, isLoading, refreshData } = useData();
+  const { loans, installments, addLoan, updateLoan, deleteLoan, addInstallments, addTransaction, isLoading, refreshData } = useData();
   const [showModal, setShowModal] = useState(false);
   const [editingLoan, setEditingLoan] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [summaryLoan, setSummaryLoan] = useState<any>(null);
 
   // Form State
   const [clientName, setClientName] = useState('');
@@ -372,10 +373,62 @@ const Loans: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  const filteredLoans = loans.filter(l => {
-    const name = l.client_name || l.clientName || '';
-    return name.toLowerCase().includes(searchTerm.toLowerCase()) || l.id.includes(searchTerm);
-  });
+  const filteredLoans = loans
+    .filter(l => {
+      const name = l.client_name || l.clientName || '';
+      return name.toLowerCase().includes(searchTerm.toLowerCase()) || l.id.includes(searchTerm);
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.start_date || a.startDate || a.created_at || '').getTime();
+      const dateB = new Date(b.start_date || b.startDate || b.created_at || '').getTime();
+      return dateB - dateA; // Most recent start_date first
+    });
+
+  // Compute loan summary for the selected loan
+  const loanSummary = useMemo(() => {
+    if (!summaryLoan) return null;
+
+    const loanInstallments = installments.filter(
+      i => (i.loan_id || i.loanId) === summaryLoan.id
+    );
+
+    const totalInstallments = loanInstallments.length;
+    const paidInstallments = loanInstallments.filter(i => i.status === 'PAID').length;
+    const today = new Date().toISOString().split('T')[0];
+    const overdueInstallments = loanInstallments.filter(
+      i => i.status !== 'PAID' && (i.due_date || i.dueDate) < today
+    ).length;
+    const pendingInstallments = totalInstallments - paidInstallments;
+
+    const totalExpectedAmount = loanInstallments.reduce(
+      (sum, i) => sum + (i.expected_amount || i.expectedAmount || 0), 0
+    );
+    const totalPaidAmount = loanInstallments.reduce(
+      (sum, i) => sum + (i.paid_amount || i.paidAmount || 0), 0
+    );
+    const totalPenalty = loanInstallments.reduce(
+      (sum, i) => sum + (i.penalty || 0), 0
+    );
+    const remainingAmount = totalExpectedAmount - totalPaidAmount;
+
+    const principalAmount = summaryLoan.principal_amount || summaryLoan.principalAmount || 0;
+    const interestEarned = totalExpectedAmount - principalAmount;
+    const progressPercent = totalInstallments > 0 ? Math.round((paidInstallments / totalInstallments) * 100) : 0;
+
+    return {
+      totalInstallments,
+      paidInstallments,
+      pendingInstallments,
+      overdueInstallments,
+      totalExpectedAmount,
+      totalPaidAmount,
+      remainingAmount,
+      totalPenalty,
+      interestEarned,
+      principalAmount,
+      progressPercent,
+    };
+  }, [summaryLoan, installments]);
 
   if (isLoading) {
     return (
@@ -439,7 +492,7 @@ const Loans: React.FC = () => {
             const freqDays = getFrequencyDays(loan.frequency);
 
             return (
-              <div key={loan.id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow relative overflow-hidden">
+              <div key={loan.id} onClick={() => setSummaryLoan(loan)} className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow relative overflow-hidden cursor-pointer group/card">
                 {loan.status === 'ACTIVE' && <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>}
                 {loan.status === 'CLOSED' && <div className="absolute top-0 left-0 w-1 h-full bg-slate-400"></div>}
 
@@ -450,8 +503,8 @@ const Loans: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`text-xs px-2 py-1 rounded-full font-medium ${loan.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{loan.status}</span>
-                    <button onClick={() => openEditModal(loan)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Edit Loan"><Pencil size={16} /></button>
-                    <button onClick={() => handleDeleteLoan(loan.id, clientName)} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="Delete Loan"><Trash2 size={16} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); openEditModal(loan); }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Edit Loan"><Pencil size={16} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteLoan(loan.id, clientName); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="Delete Loan"><Trash2 size={16} /></button>
                   </div>
                 </div>
 
@@ -469,6 +522,132 @@ const Loans: React.FC = () => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Loan Summary Modal */}
+      {summaryLoan && loanSummary && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSummaryLoan(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-5 rounded-t-2xl">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-xl font-bold">{summaryLoan.client_name || summaryLoan.clientName}</h3>
+                  <span className="text-primary-200 text-xs font-mono">#{summaryLoan.id.substring(0, 8)}</span>
+                </div>
+                <button onClick={() => setSummaryLoan(null)} className="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="mt-3 flex items-center gap-3">
+                <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${summaryLoan.status === 'ACTIVE' ? 'bg-emerald-400/20 text-emerald-100 border border-emerald-400/30' :
+                    summaryLoan.status === 'COMPLETED' ? 'bg-blue-400/20 text-blue-100 border border-blue-400/30' :
+                      'bg-slate-400/20 text-slate-100 border border-slate-400/30'
+                  }`}>{summaryLoan.status}</span>
+                <span className="text-primary-200 text-xs">Started: {summaryLoan.start_date || summaryLoan.startDate}</span>
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="px-5 pt-4">
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="text-xs font-medium text-slate-500">Repayment Progress</span>
+                <span className="text-xs font-bold text-primary-600">{loanSummary.progressPercent}%</span>
+              </div>
+              <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-700 ease-out"
+                  style={{
+                    width: `${loanSummary.progressPercent}%`,
+                    background: loanSummary.progressPercent === 100
+                      ? 'linear-gradient(90deg, #10b981, #059669)'
+                      : loanSummary.progressPercent >= 50
+                        ? 'linear-gradient(90deg, #3b82f6, #2563eb)'
+                        : 'linear-gradient(90deg, #f59e0b, #d97706)'
+                  }}
+                ></div>
+              </div>
+            </div>
+
+            {/* Stats Grid */}
+            <div className="p-5 grid grid-cols-2 gap-3">
+              {/* Installment Stats */}
+              <div className="bg-blue-50 rounded-xl p-3.5 border border-blue-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 bg-blue-100 rounded-lg"><BarChart3 size={14} className="text-blue-600" /></div>
+                  <span className="text-xs font-medium text-blue-700">Total Installments</span>
+                </div>
+                <p className="text-2xl font-bold text-blue-800">{loanSummary.totalInstallments}</p>
+              </div>
+
+              <div className="bg-emerald-50 rounded-xl p-3.5 border border-emerald-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 bg-emerald-100 rounded-lg"><CheckCircle2 size={14} className="text-emerald-600" /></div>
+                  <span className="text-xs font-medium text-emerald-700">Paid</span>
+                </div>
+                <p className="text-2xl font-bold text-emerald-800">{loanSummary.paidInstallments}</p>
+              </div>
+
+              <div className="bg-amber-50 rounded-xl p-3.5 border border-amber-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 bg-amber-100 rounded-lg"><Clock size={14} className="text-amber-600" /></div>
+                  <span className="text-xs font-medium text-amber-700">Pending</span>
+                </div>
+                <p className="text-2xl font-bold text-amber-800">{loanSummary.pendingInstallments}</p>
+              </div>
+
+              <div className="bg-red-50 rounded-xl p-3.5 border border-red-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 bg-red-100 rounded-lg"><AlertTriangle size={14} className="text-red-600" /></div>
+                  <span className="text-xs font-medium text-red-700">Overdue</span>
+                </div>
+                <p className="text-2xl font-bold text-red-800">{loanSummary.overdueInstallments}</p>
+              </div>
+            </div>
+
+            {/* Financial Details */}
+            <div className="px-5 pb-5">
+              <div className="bg-slate-50 rounded-xl border border-slate-100 divide-y divide-slate-100">
+                <div className="flex justify-between items-center p-3.5">
+                  <span className="text-sm text-slate-500 flex items-center gap-2"><IndianRupee size={14} /> Principal Amount</span>
+                  <span className="text-sm font-bold text-slate-800">₹{loanSummary.principalAmount.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center p-3.5">
+                  <span className="text-sm text-slate-500 flex items-center gap-2"><IndianRupee size={14} /> Total Expected</span>
+                  <span className="text-sm font-bold text-slate-800">₹{loanSummary.totalExpectedAmount.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center p-3.5">
+                  <span className="text-sm text-emerald-600 flex items-center gap-2"><CheckCircle2 size={14} /> Amount Received</span>
+                  <span className="text-sm font-bold text-emerald-700">₹{loanSummary.totalPaidAmount.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center p-3.5">
+                  <span className="text-sm text-amber-600 flex items-center gap-2"><Clock size={14} /> Amount Remaining</span>
+                  <span className="text-sm font-bold text-amber-700">₹{loanSummary.remainingAmount.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center p-3.5">
+                  <span className="text-sm text-purple-600 flex items-center gap-2"><TrendingUp size={14} /> Interest / Profit</span>
+                  <span className="text-sm font-bold text-purple-700">₹{loanSummary.interestEarned.toLocaleString()}</span>
+                </div>
+                {loanSummary.totalPenalty > 0 && (
+                  <div className="flex justify-between items-center p-3.5">
+                    <span className="text-sm text-red-500 flex items-center gap-2"><AlertTriangle size={14} /> Total Penalties</span>
+                    <span className="text-sm font-bold text-red-600">₹{loanSummary.totalPenalty.toLocaleString()}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 pb-5">
+              <button
+                onClick={() => setSummaryLoan(null)}
+                className="w-full py-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 font-medium transition-colors text-sm"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

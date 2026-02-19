@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useData } from '../context/DataContext';
 import { LoanType, Frequency } from '../types';
-import { CheckCircle2, AlertCircle, RotateCcw, DollarSign, Calendar, Loader2, Download, Pencil, Search } from 'lucide-react';
+import { CheckCircle2, AlertCircle, RotateCcw, DollarSign, Calendar, Loader2, Download, Pencil, Search, AlertTriangle } from 'lucide-react';
 
 const Installments: React.FC = () => {
    const { installments, updateInstallment, addTransaction, loans, addInstallments, updateLoan, isLoading } = useData();
@@ -23,9 +23,26 @@ const Installments: React.FC = () => {
       }
    };
 
-   const filtered = installments
+   // Compute effective status: if PENDING and due_date < today => OVERDUE
+   const today = new Date().toISOString().split('T')[0];
+
+   const installmentsWithOverdue = useMemo(() => {
+      return installments.map(i => {
+         const dueDate = i.due_date || i.dueDate;
+         if (i.status === 'PENDING' && dueDate < today) {
+            return { ...i, effectiveStatus: 'OVERDUE' as const };
+         }
+         return { ...i, effectiveStatus: i.status as string };
+      });
+   }, [installments, today]);
+
+   const overdueCount = useMemo(() => {
+      return installmentsWithOverdue.filter(i => i.effectiveStatus === 'OVERDUE').length;
+   }, [installmentsWithOverdue]);
+
+   const filtered = installmentsWithOverdue
       .filter(i => {
-         const matchesStatus = filter === 'ALL' ? true : i.status === filter;
+         const matchesStatus = filter === 'ALL' ? true : i.effectiveStatus === filter;
          const clientName = i.client_name || i.clientName || '';
          const matchesSearch = clientName.toLowerCase().includes(searchTerm.toLowerCase());
          return matchesStatus && matchesSearch;
@@ -255,9 +272,14 @@ const Installments: React.FC = () => {
                      <button
                         key={f}
                         onClick={() => setFilter(f as any)}
-                        className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-all whitespace-nowrap ${filter === f ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-all whitespace-nowrap flex items-center gap-1.5 ${filter === f ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                      >
                         {f}
+                        {f === 'OVERDUE' && overdueCount > 0 && (
+                           <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none animate-pulse">
+                              {overdueCount}
+                           </span>
+                        )}
                      </button>
                   ))}
                </div>
@@ -288,13 +310,15 @@ const Installments: React.FC = () => {
                            const expectedAmount = inst.expected_amount || inst.expectedAmount;
                            const penalty = inst.penalty || 0;
                            const isThisLoading = actionLoading === inst.id;
+                           const displayStatus = inst.effectiveStatus;
+                           const isOverdue = displayStatus === 'OVERDUE';
 
                            return (
-                              <tr key={inst.id} className="hover:bg-slate-50 group">
+                              <tr key={inst.id} className={`hover:bg-slate-50 group ${isOverdue ? 'bg-red-50/40' : ''}`}>
                                  <td className="px-6 py-4 text-slate-600 whitespace-nowrap">
                                     <div className="flex items-center gap-2">
-                                       <Calendar size={14} />
-                                       {dueDate}
+                                       {isOverdue ? <AlertTriangle size={14} className="text-red-500" /> : <Calendar size={14} />}
+                                       <span className={isOverdue ? 'text-red-600 font-medium' : ''}>{dueDate}</span>
                                     </div>
                                  </td>
                                  <td className="px-6 py-4 font-medium text-slate-800">{clientName}</td>
@@ -304,12 +328,12 @@ const Installments: React.FC = () => {
                                     {penalty > 0 && <span className="block text-xs text-red-500">+{penalty.toLocaleString()} Penalty</span>}
                                  </td>
                                  <td className="px-6 py-4 text-center">
-                                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${inst.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' :
-                                       inst.status === 'OVERDUE' ? 'bg-red-100 text-red-700' :
+                                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${displayStatus === 'PAID' ? 'bg-emerald-100 text-emerald-700' :
+                                       displayStatus === 'OVERDUE' ? 'bg-red-100 text-red-700' :
                                           'bg-blue-50 text-blue-700'
                                        }`}>
-                                       {inst.status === 'PAID' ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
-                                       {inst.status}
+                                       {displayStatus === 'PAID' ? <CheckCircle2 size={12} /> : displayStatus === 'OVERDUE' ? <AlertTriangle size={12} /> : <AlertCircle size={12} />}
+                                       {displayStatus}
                                     </span>
                                  </td>
                                  <td className="px-6 py-4 text-right">
