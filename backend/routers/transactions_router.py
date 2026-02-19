@@ -172,7 +172,12 @@ async def get_financial_summary(
     user_id: str = Depends(get_current_user_id),
     db: Client = Depends(get_supabase_admin)
 ):
-    """Get financial summary for dashboard"""
+    """Get financial summary for dashboard
+    
+    Money In Hand = sum(CREDITs) - sum(DEBITs) from transactions table
+      - This naturally handles the reinvestment cycle
+      - Disbursements are DEBIT, repayments are CREDIT
+    """
     try:
         # Get all loans
         loans_response = db.table("loans").select("*").eq("user_id", user_id).execute()
@@ -191,7 +196,7 @@ async def get_financial_summary(
         active_loans = len([l for l in loans if l.get("status") == "ACTIVE"])
         total_disbursed = sum(float(l.get("principal_amount", 0)) for l in loans)
         
-        # Market amount calculation
+        # Market amount calculation (original logic — based on unpaid installments)
         market_amount = 0.0
         market_principal = 0.0
         market_interest = 0.0
@@ -233,25 +238,39 @@ async def get_financial_summary(
                         market_amount += remaining
                         market_interest += remaining
 
-        # Cash Flow Calculations
-        # 1. Total Inflow = All Installments Paid + All Credit Transactions
-        total_installments_collected = sum(float(inst.get("paid_amount", 0)) for inst in installments)
-        total_txn_credit = sum(float(txn.get("amount", 0)) for txn in transactions if txn.get("type") == "CREDIT")
+        # ─── Money In Hand (Reinvestment Cycle) ───────────────────
+        # Pure transaction-based: CREDITs - DEBITs
+        # Loan disbursements are already recorded as DEBIT transactions
+        # Repayments are already recorded as CREDIT transactions
+        # This naturally handles the reinvestment cycle
+        total_txn_credit = sum(
+            float(txn.get("amount", 0)) 
+            for txn in transactions 
+            if txn.get("type") == "CREDIT"
+        )
+        total_txn_debit = sum(
+            float(txn.get("amount", 0)) 
+            for txn in transactions 
+            if txn.get("type") == "DEBIT"
+        )
         
-        total_inflow = total_installments_collected + total_txn_credit
-        total_collected = total_installments_collected # Keeping collected as just installments for clarity
+        total_inflow = total_txn_credit
+        total_outflow = total_txn_debit
+        cash_in_hand = max(0, total_inflow - total_outflow)
         
-        # 2. Total Outflow = All Loan Disbursements + All Debit Transactions
-        # Note: We assume disbursements are NOT recorded as separate Debit transactions.
-        total_txn_debit = sum(float(txn.get("amount", 0)) for txn in transactions if txn.get("type") == "DEBIT")
+        # Total collected from installments (for reference)
+        total_collected = sum(
+            float(inst.get("paid_amount", 0)) for inst in installments
+        )
         
-        total_outflow = total_disbursed + total_txn_debit
-
-        # 3. Cash in Hand
-        cash_in_hand = total_inflow - total_outflow
+        # Overdue metrics — date-based detection
+        from datetime import date
+        today_str = date.today().isoformat()
         
-        # Overdue metrics
-        overdue_installments = [inst for inst in installments if inst.get("status") == "OVERDUE"]
+        overdue_installments = [
+            inst for inst in installments 
+            if inst.get("status") != "PAID" and (inst.get("due_date", "") < today_str)
+        ]
         overdue_count = len(overdue_installments)
         overdue_amount = sum(
             float(inst.get("expected_amount", 0)) - float(inst.get("paid_amount", 0))

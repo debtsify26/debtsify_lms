@@ -5,7 +5,7 @@ import { Wallet, TrendingUp, Landmark, Users } from 'lucide-react';
 const InvestmentAnalytics: React.FC = () => {
     const { loans, installments, localSummary } = useData();
 
-    // Calculate dynamic data from local context
+    // Net cash position (Money In Hand) — reinvestment cycle
     const { cashInHand } = localSummary();
 
     const activeLoans = loans.filter(l => l.status === 'ACTIVE');
@@ -17,30 +17,19 @@ const InvestmentAnalytics: React.FC = () => {
             const l_principal = Number(loan.principal_amount || loan.principalAmount || 0);
             const multiplier = Number(loan.total_rate_multiplier || loan.totalRateMultiplier || 1);
 
-            // For Total Rate: Principal * Multiplier
-            // For Daily Rate: We need to determine "Total expected" differently or just show Principal + Accrued?
-            // Existing logic assumes Total Rate logic mostly. 
-            // If Daily Rate, 'total_repay' is tricky because it's indefinite.
-            // Let's assume for Daily Rate loan, we just track Principal + Current Due?
-            // The previous logic was: total_repay = l_principal * multiplier.
-            // If Daily Rate, multiplier might be 1 (or 0?).
-            // Let's stick to existing logic but safe guard multiplier.
-
             const total_repay = loan.type === 'TOTAL_RATE'
                 ? l_principal * multiplier
-                : l_principal; // For Daily Rate, "Market Capital" is just Principal
+                : l_principal;
 
             const total_interest = loan.type === 'TOTAL_RATE'
                 ? total_repay - l_principal
-                : 0; // Interest is calculated daily, not fixed upfront
+                : 0;
 
             // Calculate received amount
             const loan_insts = installments.filter(i => (i.loan_id || i.loanId) === loan.id);
             const received = loan_insts.reduce((sum, inst) => sum + Number(inst.paid_amount || inst.paidAmount || 0), 0);
 
             // Market value (Remaining)
-            // For Total Rate: Total Expected - Received
-            // For Daily Rate: Principal is the main "Market Value" until settled.
             const market_total = Math.max(0, total_repay - received);
 
             // Breakdown remaining into Principal vs Interest
@@ -86,7 +75,7 @@ const InvestmentAnalytics: React.FC = () => {
             </div>
             <div>
                 <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
-                <h3 className="text-2xl font-bold text-slate-800">₹{value.toLocaleString()}</h3>
+                <h3 className="text-2xl font-bold text-slate-800">₹{Math.max(0, value).toLocaleString()}</h3>
                 {subValue && <p className="text-xs text-slate-400 mt-1">{subValue}</p>}
             </div>
         </div>
@@ -97,15 +86,15 @@ const InvestmentAnalytics: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <SummaryCard
                     title="Money in Hand"
-                    value={totalReceived}
-                    subValue="Total repayments received"
+                    value={cashInHand}
+                    subValue="Net cash position (Inflows − Outflows)"
                     icon={Wallet}
                     color="bg-emerald-500"
                 />
                 <SummaryCard
                     title="Money in Market"
                     value={totalMoneyInMarket}
-                    subValue={`Principal: ₹${Math.round(totalPrincipalInMarket).toLocaleString()}`}
+                    subValue={`Principal: ₹${Math.max(0, Math.round(totalPrincipalInMarket)).toLocaleString()}`}
                     icon={Landmark}
                     color="bg-blue-500"
                 />
@@ -149,9 +138,9 @@ const InvestmentAnalytics: React.FC = () => {
                                         <td className="px-6 py-4 font-mono">₹{row.capital.toLocaleString()}</td>
                                         <td className="px-6 py-4 text-slate-600">{row.interestRate === 'Daily' ? 'Daily' : `${row.interestRate}%`}</td>
                                         <td className="px-6 py-4 text-right text-emerald-600 font-medium">₹{row.received.toLocaleString()}</td>
-                                        <td className="px-6 py-4 text-right text-slate-600">₹{Math.ceil(row.marketPrincipal).toLocaleString()}</td>
-                                        <td className="px-6 py-4 text-right text-amber-600">₹{Math.ceil(row.marketInterest).toLocaleString()}</td>
-                                        <td className="px-6 py-4 text-right font-bold text-slate-800">₹{Math.ceil(row.marketTotal).toLocaleString()}</td>
+                                        <td className="px-6 py-4 text-right text-slate-600">₹{Math.max(0, Math.ceil(row.marketPrincipal)).toLocaleString()}</td>
+                                        <td className="px-6 py-4 text-right text-amber-600">₹{Math.max(0, Math.ceil(row.marketInterest)).toLocaleString()}</td>
+                                        <td className="px-6 py-4 text-right font-bold text-slate-800">₹{Math.max(0, Math.ceil(row.marketTotal)).toLocaleString()}</td>
                                     </tr>
                                 ))
                             )}

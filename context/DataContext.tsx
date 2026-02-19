@@ -189,30 +189,30 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const localSummary = () => {
     const activeLoans = loans.filter(l => l.status === 'ACTIVE');
 
+    // Market amount (original logic — total expected from active loans)
     const marketAmount = activeLoans.reduce((sum, loan) => {
-      if (loan.type === 'TOTAL_RATE' && loan.total_rate_multiplier) {
-        return sum + (loan.principal_amount * loan.total_rate_multiplier);
+      if (loan.type === 'TOTAL_RATE' && (loan.total_rate_multiplier || loan.totalRateMultiplier)) {
+        return sum + ((loan.principal_amount || loan.principalAmount || 0) * (loan.total_rate_multiplier || loan.totalRateMultiplier));
       } else if (loan.type === 'DAILY_RATE') {
-        return sum + loan.principal_amount;
+        return sum + (loan.principal_amount || loan.principalAmount || 0);
       }
       return sum;
     }, 0);
 
+    // Money In Hand = net cash flow (CREDITs - DEBITs)
+    // Naturally handles reinvestment cycle
     const totalInflow = transactions
       .filter(t => t.type === 'CREDIT')
       .reduce((sum, t) => sum + t.amount, 0);
 
-    // totalDisbursed is used for Market Amount stats, but NOT for Cash Flow (since it's in transactions)
-    const totalDisbursed = loans.reduce((sum, loan) => sum + loan.principal_amount, 0);
+    const totalDisbursed = loans.reduce((sum, loan) => sum + (loan.principal_amount || loan.principalAmount || 0), 0);
 
     const totalDebits = transactions
       .filter(t => t.type === 'DEBIT')
       .reduce((sum, t) => sum + t.amount, 0);
 
-    // Outflow is just Debits (includes expenses + loan disbursements)
     const totalOutflow = totalDebits;
-
-    const cashInHand = totalInflow - totalOutflow;
+    const cashInHand = Math.max(0, totalInflow - totalOutflow);
 
     return {
       marketAmount,
