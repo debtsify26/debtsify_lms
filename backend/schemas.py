@@ -54,6 +54,7 @@ class UserResponse(BaseModel):
     id: str
     email: str
     full_name: str
+    spreadsheet_id: Optional[str] = None
     created_at: datetime
 
 

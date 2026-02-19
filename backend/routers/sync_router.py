@@ -45,21 +45,56 @@ def perform_sync(user_id: str, db: Client, create_monthly_archive: bool = False)
         transactions_response = db.table("transactions").select("*").eq("user_id", user_id).execute()
         
         # 1. Update main live spreadsheet
-        title = f"Debtsify_Sync_{user_id}"
-        if settings.google_spreadsheet_id:
-            spreadsheet = client.open_by_key(settings.google_spreadsheet_id)
-        else:
-            try:
-                spreadsheet = client.open(title)
-            except gspread.exceptions.SpreadsheetNotFound:
-                spreadsheet = client.create(title)
+        # 1. Update main live spreadsheet
+        # Fetch user's spreadsheet_id
+        user_data_response = db.table("users").select("spreadsheet_id, email").eq("id", user_id).single().execute()
+        user_record = user_data_response.data if user_data_response else {}
+        spreadsheet_id = user_record.get("spreadsheet_id")
+        user_email = user_record.get("email")
+
+        spreadsheet = None
         
-        # Share with user's email
+        # If user has a sheet, try to open it
+        if spreadsheet_id:
+            try:
+                spreadsheet = client.open_by_key(spreadsheet_id)
+            except gspread.exceptions.SpreadsheetNotFound:
+                print(f"User's assigned spreadsheet {spreadsheet_id} not found. Creating a new one.")
+                spreadsheet = None
+            except Exception as e:
+                print(f"Error opening spreadsheet {spreadsheet_id}: {e}. Will attempt to create/open generic.")
+                spreadsheet = None
+
+        # If no sheet found or opening failed, create/open by title
+        if not spreadsheet:
+            title = f"Debtsify_Sheet_{user_id}" 
+            # Note: Changed naming slightly to be cleaner
+            
+            try:
+                # Try to find by title first to avoid duplicate creation if ID was just missing/mismatched
+                try:
+                    spreadsheet = client.open(title)
+                except gspread.exceptions.SpreadsheetNotFound:
+                    spreadsheet = client.create(title)
+                
+                # Update user record with new spreadsheet_id
+                if spreadsheet:
+                    try:
+                        db.table("users").update({"spreadsheet_id": spreadsheet.id}).eq("id", user_id).execute()
+                        print(f"Linked new spreadsheet {spreadsheet.id} to user {user_id}")
+                    except Exception as update_err:
+                        print(f"Failed to save spreadsheet_id to user record: {update_err}")
+
+            except Exception as create_err:
+                print(f"Failed to create/open spreadsheet: {create_err}")
+                # Fallback to global only if absolutely necessary, but per requirement we want independent.
+                # If we fail here, we probably fail completely.
+                raise create_err
+
+        # Share with user's email if not already shared (Service Account logic)
         try:
-            user_data = db.table("users").select("email").eq("id", user_id).single().execute()
-            if user_data and user_data.data and user_data.data.get("email"):
-                user_email = user_data.data.get("email")
-                print(f"Sharing spreadsheet with {user_email}...")
+            if user_email:
+                print(f"Sharing spreadsheet {spreadsheet.id} with {user_email}...")
                 spreadsheet.share(user_email, perm_type='user', role='writer')
         except Exception as share_error:
             print(f"Warning: Failed to share spreadsheet with user: {str(share_error)}")

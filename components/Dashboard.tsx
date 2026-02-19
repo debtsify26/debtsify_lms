@@ -197,7 +197,7 @@ const Dashboard: React.FC = () => {
         />
         <KPICard
           title="Total Outflow"
-          amount={summary.totalOutflow}
+          amount={Math.max(0, summary.totalOutflow - summary.totalInflow)}
           icon={TrendingDown}
           color="bg-rose-500"
         />

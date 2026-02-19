@@ -203,7 +203,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, setView, children, userNam
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
             <h3 className="text-lg font-bold text-slate-900 mb-3">Sync Status</h3>
-            <p className="text-slate-700 mb-4">{syncNotification.message}</p>
+            <p className="text-slate-700 mb-4 break-words">{syncNotification.message}</p>
 
             {syncNotification.url && (
               <a
